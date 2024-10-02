@@ -1,0 +1,24 @@
+# Ignore virtual environment
+.venv
+
+# Ignore IDE settings
+.vscode
+
+# Ignore original imgs
+imgs
+imgs/*
+
+# Ignore dataset files
+# data/Kaggle_Dataset
+
+# Ignore any images inside frames directories
+**/frames/**
+
+# Ignore OS files
+.DS_Store
+Thumbs.db
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
