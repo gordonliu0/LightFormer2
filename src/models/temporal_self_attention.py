@@ -18,10 +18,9 @@ class TemporalSelfAttention(nn.Module):
         self.norm = nn.LayerNorm(self.embed_dim)
 
     def forward(self, query, prev_embed=None):
-        bypass = query
         if prev_embed is None:
             prev_embed = query
         output, _ = self.temporal_attention(query, prev_embed, prev_embed)
-        output = self.norm(output+bypass)
+        output = self.norm(output + query)
         return output
 

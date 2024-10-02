@@ -1,16 +1,25 @@
-import torch
 import torch.nn as nn
-from torch.nn import Parameter
-import torch.nn.functional as F
-import math
+from deformable_attention import DeformableAttention
 
 class SpatialCrossAttention(nn.Module):
     """
-    Implementation of SpatialCrossAttention.
+    Alternate implementation of SpatialCrossAttention using DAT rather than DETR attention module.
     """
-    def __init__(self, in_features, out_features, n, s=20.0, m=0.5, easy_margin=False):
-        super().__init__
-        pass
+    def __init__(self):
+        super().__init__()
+        self.deformable_attention = DeformableAttention(
+            dim = 256,                      # feature dimensions
+            dim_head = 16,                  # dimension per head
+            heads = 16,                     # attention heads
+            dropout = 0.1,                   # dropout
+            downsample_factor = 4,          # downsample factor (r in paper)
+            offset_scale = 4,               # scale of offset, maximum offset
+            offset_groups = 4,              # number of offset groups, a factor of heads
+            offset_kernel_size = 6,         # offset kernel size
+        )
+        self.norm = nn.LayerNorm(256)
 
-    def forward(self, input, label=None):
-        pass
+    def forward(self, x):
+        output = self.deformable_attention(x) + x
+        output = self.norm(output)
+        return output
