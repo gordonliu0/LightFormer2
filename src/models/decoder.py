@@ -1,18 +1,26 @@
-import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from models import MultiArcFace
+from models import SubcenterArcface
 
 class Decoder(nn.Module):
-    def __init__(self, config):
-        super(Decoder,self).__init__()
-        self.config = config
-        self.mul_arcface = MultiArcFace(self.config["mlp_out_channel"], self.config["n"] * self.config["out_class_num"], self.config["n"], s=20, m=0.5, easy_margin=True)
+    def __init__(self):
+        super().__init__()
 
-    def forward(self, agent_all_feature, label=None):
-        B, K, _,_ = agent_all_feature.shape
-        prob = self.mul_arcface(agent_all_feature,label)
-        prob = prob.view(B, self.config['n'], self.config['out_class_num'], 1)
-        res, idx = torch.max(prob, dim=1)
-        res = F.softmax(res, dim=1)
+        self.K = 4
+        self.out_class_num = 2
+
+        # K = 3 used in Sub-Center ArcFace 2020, w=20 used in LightFormer 2023
+        # s = 64.0 in ArcFace 2018, Sub-Center ArcFace 2020
+        # m = 0.5 in both LightFormer 2023, Sub-Center ArcFace 2020
+        self.sub_arcface = SubcenterArcface(
+            in_features = 1024,
+            out_features = self.out_class_num,
+            K = self.K,
+            s = 64.0,
+            m = 0.5,
+        )
+
+    def forward(self, x):
+        arcface = self.sub_arcface(x)
+        res = F.softmax(arcface, dim=1)
         return res
