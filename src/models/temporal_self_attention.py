@@ -1,14 +1,10 @@
-import torch
 import torch.nn as nn
-from torch.nn import Parameter
-import torch.nn.functional as F
-import math
 
 class TemporalSelfAttention(nn.Module):
     """
     Implementation of TemporalSelfAttention.
     """
-    def __init__(self, in_features, out_features, n, s=20.0, m=0.5, easy_margin=False):
+    def __init__(self):
         super.__init__()
 
         self.num_heads = 8
