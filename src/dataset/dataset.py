@@ -1,11 +1,12 @@
 import torch
-from torch.utils.data import  Dataset
-import numpy as np
+from torch.utils.data import Dataset
 import json
 import os
-from torchvision.transforms import Resize, InterpolationMode
+import numpy as np
+from torchvision.transforms import Normalize
 from pathlib import Path
-
+from torchvision.transforms.v2.functional import resize
+from torchvision.io import read_image
 
 class LightFormerDataset(Dataset):
     """
@@ -13,20 +14,19 @@ class LightFormerDataset(Dataset):
     https://pytorch.org/tutorials/beginner/basics/data_tutorial.html#creating-a-custom-dataset-for-your-files
     """
 
-    def __init__(self, img_dir, transform=None):
+    def __init__(self, directory):
         """
         Args:
-            img_dir (list): Paths to the image directories, which should include a .json with annotations.
-            transform (callable, optional): Optional transform to be applied on a sample.
+            directory (list): Paths to the image directories, which should include a .json with annotations.
         """
 
-        self.img_dir = img_dir
+        # frames holds image buffer names and label, root_dir_list holds image directory
         self.frames = []
         self.root_dir_list = []
-        self.transform = transform
+        self.transform = Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225))
 
         # handle a list of img_dir
-        for sub_path in self.img_dir:
+        for sub_path in directory:
             json_files = sorted(os.path.join(sub_path, x) for x in os.listdir(sub_path) if (x.endswith('.json')))
             for x in json_files:
                 with open(x, 'r') as opened_file:
@@ -37,33 +37,40 @@ class LightFormerDataset(Dataset):
     def __len__(self):
         return len(self.frames)
 
-    def __getitem__(self, idx):
-        if torch.is_tensor(idx):
-            idx = idx.tolist()
-        img_names = self.frames[idx]['images']
-        root_dir = self.root_dir_list[idx]
-        images = torch.from_numpy(np.zeros((10,3,512,960),dtype='float32'))
-        for i,img_name in enumerate(img_names):
-            image_path = os.path.join(root_dir, 'frames', img_name)
-            image = io.imread(image_path)
-            image = resize(image, (512, 960), anti_aliasing=True)
-            # numpy image: H x W x C
-            # torch image: C x H x W
-            image = image.transpose((2, 0, 1)) / 255.0
-            image = image.astype('float32')
-            image = torch.from_numpy(image)
-            image = self.transform(image)
-            images[i] = image
+    def __getitem__(self, i):
 
-        label = self.frames[idx]['label'][:4]
-        label = np.array([label])
-        label = label.astype('float32')
-        label = torch.from_numpy(label)
-        label = label.squeeze()
+        # make sure index i is an Python list
+        if torch.is_tensor(i):
+            i = i.tolist()
+
+        # get data from frames array
+        image_names = self.frames[i]['images']
+        root_directories = self.root_dir_list[i]
+
+        # populate images
+        images = torch.from_numpy(np.zeros((10,3,512,960),dtype='float32'))
+        for i, img_name in enumerate(image_names):
+            image_path = os.path.join(root_directories, 'frames', img_name)
+            image = read_image(image_path)
+            image = resize(image, (512, 960), antialias=True)
+            image = image.to(torch.float32)
+            image = image / 255.0
+            images[i] = image
+            image = self.transform(image)
+
+        # populate label
+        label = self.frames[i]['label']
+        label = torch.tensor(label)
+        label = label.to(torch.float32)
+
+        # populate name
+        name = image_names[0]
+
+        # return dictionary
         sample = {
             'images': images,
             'label': label,
-            'name': img_names[0],
+            'name': name,
         }
 
         return sample

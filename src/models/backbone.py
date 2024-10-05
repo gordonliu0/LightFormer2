@@ -1,6 +1,7 @@
 from functools import partial
 from torch import nn
 from torchvision import models
+from torchvision.models import resnet18, ResNet18_Weights
 
 def _resnet_forward(self, x):
     x = self.conv1(x)
@@ -21,7 +22,7 @@ class Backbone(nn.Module):
         super().__init__()
 
         # Remove last two layers: Average Pooling and Fully Connected
-        self.resnet = models.resnet18(pretrained=True)
+        self.resnet = resnet18(weights = ResNet18_Weights.IMAGENET1K_V1)
         self.resnet.fc = None
         self.resnet.avgpool = None
 
