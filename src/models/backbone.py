@@ -1,6 +1,5 @@
 from functools import partial
 from torch import nn
-from torchvision import models
 from torchvision.models import resnet18, ResNet18_Weights
 
 def _resnet_forward(self, x):

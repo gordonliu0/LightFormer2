@@ -1,10 +1,10 @@
-from lightformer import LightFormer
-from backbone import Backbone
-from decoder import Decoder
-from encoder import Encoder
-from multi_arcface import SubcenterArcface
-from spatial_cross_attention import SpatialCrossAttention
-from temporal_self_attention import TemporalSelfAttention
+from models.lightformer import LightFormer
+from models.backbone import Backbone
+from models.decoder import Decoder
+from models.encoder import Encoder
+from models.multi_arcface import SubcenterArcface
+from models.spatial_cross_attention import SpatialCrossAttention
+from models.temporal_self_attention import TemporalSelfAttention
 
 __all__ = ['LightFormer',
            'Backbone',

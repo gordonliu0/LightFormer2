@@ -1,5 +1,7 @@
 from torch import nn
-from models import Backbone, Encoder, Decoder
+from models.backbone import Backbone
+from models.encoder import Encoder
+from models.decoder import Decoder
 
 class LightFormer(nn.Module):
     def __init__(self):
@@ -33,7 +35,7 @@ class LightFormer(nn.Module):
 
     def forward(self, x):
         """
-        x: image buffer
+        x: image buffer of size 10
         """
         # Backbone
         x = self.backbone(x)

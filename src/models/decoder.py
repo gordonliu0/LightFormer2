@@ -1,6 +1,6 @@
 import torch.nn as nn
 import torch.nn.functional as F
-from models import SubcenterArcface
+from models.subcenter_arcface import SubcenterArcface
 
 class Decoder(nn.Module):
     def __init__(self):

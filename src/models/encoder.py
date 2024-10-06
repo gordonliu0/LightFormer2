@@ -1,5 +1,6 @@
 import torch.nn as nn
-from models import TemporalSelfAttention, SpatialCrossAttention
+from models.temporal_self_attention import TemporalSelfAttention
+from models.spatial_cross_attention import SpatialCrossAttention
 
 class Encoder(nn.Module):
     def __init__(self):
