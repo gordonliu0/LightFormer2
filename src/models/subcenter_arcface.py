@@ -8,6 +8,8 @@ class SubcenterArcface(nn.Module):
     Implementation of subcenter large margin arc distance.
     """
     def __init__(self, in_features, out_features, K, s=64.0, m=0.5):
+        super().__init__()
+
         self.in_features = in_features
         self.out_features = out_features
         self.cluster_centres = K
