@@ -5,7 +5,7 @@ class TemporalSelfAttention(nn.Module):
     Implementation of TemporalSelfAttention.
     """
     def __init__(self):
-        super.__init__()
+        super().__init__()
 
         self.num_heads = 8
         self.embed_dim = 256
