@@ -10,13 +10,13 @@ class TemporalSelfAttention(nn.Module):
         self.num_heads = 8
         self.embed_dim = 256
 
-        self.temporal_attention = nn.MultiheadAttention(self.embed_dim, self.num_heads, batch_first=True)
+        self.mha = nn.MultiheadAttention(self.embed_dim, self.num_heads, batch_first=True)
         self.norm = nn.LayerNorm(self.embed_dim)
 
     def forward(self, query, prev_embed=None):
         if prev_embed is None:
             prev_embed = query
-        output, _ = self.temporal_attention(query, prev_embed, prev_embed)
+        output, _ = self.mha(query, prev_embed, prev_embed)
         output = self.norm(output + query)
         return output
 
