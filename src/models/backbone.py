@@ -44,11 +44,13 @@ class Backbone(nn.Module):
         Returns an image feature map tensor of size batch_size, image_count, 256 channels, height-4, width-4
         """
         batch_size, image_count, channels, height, width = x.shape
-        print(x.shape)
+        print("Original input shape:", x.shape)
         x = x.reshape(batch_size * image_count, channels, height, width)
         x = self.resnet(x)
+        print("Resnet output shape:", x.shape)
         x = self.down_conv(x)
         _, c, h, w = x.shape
-        print(x.shape)
+        print("Down_Conv output shape:", x.shape)
         x = x.reshape(batch_size, image_count, c, h, w)
+        print("Backbone output shape:", x.shape)
         return x
