@@ -27,19 +27,17 @@ class Encoder(nn.Module):
     def forward(self, query, x):
         B, num_imgs, channels, h, w = x.shape # [32, 10, 256, 12, 26]
         ref_2d = self.get_reference_points(h, w, B)
-        all_feats = x.flatten(3).permute(0, 1, 3, 2)  # [32, 10, 312, 256]
         query = query.unsqueeze(0).repeat(B, 1, 1) # [32, 1, 256]
-        _,num_imgs,resolu,_ = all_feats.shape
 
         output = None
         for i in range(num_imgs):
-            single_feat = all_feats[:, i, :, :].view(B, resolu, self.num_heads, -1)
+            single_feat = x[:, i, :, :, :]
             print("Single Feat Size:", single_feat.shape) # [32, 312, 16, 16]
 
             output = self.tsa(query, self.prev_embed)
             print("TSA Size:", output.shape) # [32, 1, 256]
 
-            output = self.sca(output, single_feat)
+            output = self.sca(single_feat, output)
             output = output.mean(1).unsqueeze(1)
             output = self.mlp(output) + output
             output = self.norm(output)
