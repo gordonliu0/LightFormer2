@@ -53,7 +53,12 @@ device = (
     else "cpu"
 )
 model = LightFormer().to(device)
-print(model)
+
+# Freeze Resnet Layers
+def freeze_backbone(model):
+    for param in model.backbone.resnet.parameters():
+        param.requires_grad = False
+freeze_backbone(model=model)
 summary(model, input_size=(batch_size, 10, 3, 512, 960))
 
 loss_fn = nn.CrossEntropyLoss()

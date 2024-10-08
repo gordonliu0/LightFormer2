@@ -32,11 +32,7 @@ class Encoder(nn.Module):
         output = None
         for i in range(num_imgs):
             single_feat = x[:, i, :, :, :]
-            print("Single Feat Size:", single_feat.shape) # [32, 312, 16, 16]
-
             output = self.tsa(query, self.prev_embed)
-            print("TSA Size:", output.shape) # [32, 1, 256]
-
             output = self.sca(single_feat, output)
             output = output.mean(1).unsqueeze(1)
             output = self.mlp(output) + output
