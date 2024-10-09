@@ -8,7 +8,7 @@ from deformable_attention.deformable_attention_2d import create_grid_like, norma
 from einops import rearrange
 from functools import partial
 
-def _forward(self, x, q=None, return_vgrid = False):
+def _forward(self, x, q = None, return_vgrid = False):
     """
     b - batch
     h - heads
@@ -109,7 +109,8 @@ class SpatialCrossAttention(nn.Module):
         # DAT and 1x1 Convolution to use query to attend to a single image feature map, resulting in
         # a image embedding of the same shape as query
         output = self.deformable_attention(x, q)
-        output = output.view(32, 256, -1).permute(0, 2, 1)
+        bs = x.shape[0]
+        output = output.view(bs, 256, -1).permute(0, 2, 1)
         output = self.conv(output)
 
         # LayerNorm, Dropout, and Skip Connections
