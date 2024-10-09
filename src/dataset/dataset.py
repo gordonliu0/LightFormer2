@@ -49,14 +49,14 @@ class LightFormerDataset(Dataset):
 
         # populate images
         images = torch.from_numpy(np.zeros((10,3,512,960),dtype='float32'))
-        for i, img_name in enumerate(image_names):
+        for index, img_name in enumerate(image_names):
             image_path = os.path.join(root_directories, 'frames', img_name)
             image = read_image(image_path)
             image = resize(image, (512, 960), antialias=True)
             image = image.to(torch.float32)
             image = image / 255.0
-            images[i] = image
             image = self.transform(image)
+            images[index] = image
 
         # populate label
         label = self.frames[i]['label']

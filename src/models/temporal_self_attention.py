@@ -18,6 +18,5 @@ class TemporalSelfAttention(nn.Module):
             prev_embed = query
         output, _ = self.mha(query, prev_embed, prev_embed)
         output = self.norm(output + query)
-        print("TSA shape:", output.shape)
         return output
 

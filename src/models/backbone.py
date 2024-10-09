@@ -1,6 +1,7 @@
 from functools import partial
 from torch import nn
 from torchvision.models import resnet18, ResNet18_Weights
+from types import MethodType
 from models.identity import Identity
 
 class Backbone(nn.Module):
@@ -33,6 +34,7 @@ class Backbone(nn.Module):
         batch_size, image_count, channels, height, width = x.shape
         x = x.reshape(batch_size * image_count, channels, height, width)
         x = self.resnet(x)
+        x = x.view(batch_size*image_count, 512, 16, 30)
         x = self.down_conv(x)
         _, c, h, w = x.shape
         x = x.reshape(batch_size, image_count, c, h, w)
