@@ -5,6 +5,8 @@ from torchvision import transforms
 from torch.utils.data import DataLoader, random_split
 from dataset import LightFormerDataset
 from torchinfo import summary
+import os
+import datetime
 
 # Training Constants
 DIRECTORIES = [ '/Users/gordonliu/Documents/ml_projects/LightForker-2/data/Kaggle_Dataset/daySequence1',
@@ -39,7 +41,7 @@ generator = torch.Generator().manual_seed(42)
 train_dataset, test_dataset, val_dataset = random_split(full_dataset,
                                                         [TRAIN_SPLIT, TEST_SPLIT, VAL_SPLIT],
                                                         generator=generator)
-batch_size = 32
+batch_size = 16
 train_dataloader = DataLoader(train_dataset, batch_size=batch_size)
 test_dataloader = DataLoader(test_dataset, batch_size=batch_size)
 val_dataloader = DataLoader(val_dataset, batch_size=batch_size)
@@ -52,6 +54,10 @@ device = (
     if torch.backends.mps.is_available()
     else "cpu"
 )
+print(f'Using device "{device}"')
+if device == "mps":
+    os.environ['PYTORCH_ENABLE_MPS_FALLBACK'] = '1' # used to provide fallback if MPS
+
 model = LightFormer().to(device)
 
 # Freeze Resnet Layers
@@ -64,63 +70,109 @@ freeze_backbone(model=model)
 print(model)
 summary(model, input_size=(batch_size, 10, 3, 512, 960))
 
+# Loss and Optimizer for Training
 loss_fn = nn.CrossEntropyLoss()
-optimizer = torch.optim.adam(model.parameters(), lr=1e-3)
+optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
 
-def train(dataloader, model, loss_fn, optimizer):
+# Test some permutation stuff
+# test_iter = iter(test_dataloader)
+# z = next(test_iter)
+# print(z['label'].to(device).view(32, 2, 2).permute(1, 0, 2)[0].shape)
+# del(z)
+# del(test_iter)
+
+def train(dataloader, model, loss_fn, optimizer, log_batches=100):
+    # Last Loss holds average loss for the last log_batches
+    st = { 'running_loss': 0., 'last_loss': 0.}
+    lf = { 'running_loss': 0., 'last_loss': 0.}
+    total = { 'running_loss': 0., 'last_loss': 0.}
+
     size = len(dataloader.dataset)
     model.train()
-    for batch, (X, y) in enumerate(dataloader):
-        X, y = X.to(device), y.to(device)
+    for batch_index, batch in enumerate(dataloader):
+        # Load sample and label
+        X = batch['images'].to(device)
+        y = batch['label'].to(device).view(len(X), 2, 2).permute(1, 0, 2)
 
-        # Compute prediction error
-        pred = model(X)
-        loss = loss_fn(pred, y)
+        # Compute prediction
+        st_class, lf_class = model(X)
+
+        # Compute loss
+        st_loss = loss_fn(st_class, y[0])
+        lf_loss = loss_fn(lf_class, y[1])
+        total_loss = st_loss + lf_loss
 
         # Backpropagation
-        loss.backward()
+        total_loss.backward()
         optimizer.step()
         optimizer.zero_grad()
 
-        if batch % 100 == 0:
-            loss, current = loss.item(), (batch + 1) * len(X)
-            print(f"loss: {loss:>7f}  [{current:>5d}/{size:>5d}]")
+        # Gather Data and Report
+        st['running_loss'] += st_loss.item()
+        lf['running_loss'] += lf_loss.item()
+        total['running_loss'] += total_loss.item()
+        if batch_index % log_batches == 0:
+            current_sample_index = (batch_index + 1) * len(X)
+            st['last_loss'] = st['running_loss'] / log_batches
+            lf['last_loss'] = lf['running_loss'] / log_batches
+            total['last_loss'] = total['running_loss'] / log_batches
+            print(f"st_loss: {st['last_loss']:>7f} lf_loss: {lf['last_loss']:>7f} total_loss: {total['last_loss']:>7f}  Sample [{current_sample_index:>5d}/{size:>5d}], Batch {batch_index}")
 
-def test(dataloader, model, loss_fn):
+def validate(dataloader, model, loss_fn):
     size = len(dataloader.dataset)
     num_batches = len(dataloader)
     model.eval()
-    test_loss, correct = 0, 0
+    test_loss, st_correct, lf_correct,  = 0, 0, 0
     with torch.no_grad():
-        for X, y in dataloader:
-            X, y = X.to(device), y.to(device)
-            pred = model(X)
-            test_loss += loss_fn(pred, y).item()
-            correct += (pred.argmax(1) == y).type(torch.float).sum().item()
-    test_loss /= num_batches
-    correct /= size
-    print(f"Test Error: \n Accuracy: {(100*correct):>0.1f}%, Avg loss: {test_loss:>8f} \n")
+        for batch in dataloader:
+            # Load sample and label
+            X = batch['images'].to(device)
+            y = batch['label'].to(device).view(len(X), 2, 2).permute(1, 0, 2)
 
-epochs = 15
+            # Compute predictions
+            st_class, lf_class = model(X)
+
+            # Compute loss
+            st_loss = loss_fn(st_class, y[0])
+            lf_loss = loss_fn(lf_class, y[1])
+            total_loss = st_loss+lf_loss
+
+            # Gather data
+            test_loss += total_loss.item()
+            st_correct += (st_class.argmax(1) == y[0]).type(torch.float).sum().item()
+            lf_correct += (lf_class.argmax(1) == y[0]).type(torch.float).sum().item()
+    test_loss /= num_batches
+    st_accuracy = st_correct/size
+    lf_accuracy = lf_correct/size
+    print(f"Test Error: \n Straight Accuracy: {(100*st_accuracy):>0.1f}%, Left Accuracy: {(100*lf_accuracy):>0.1f}%, Average loss: {test_loss:>8f} \n")
+    return test_loss
+
+epochs = 5
 for t in range(epochs):
+    best_vloss = 1000000
     print(f"Epoch {t+1}\n-------------------------------")
     train(train_dataloader, model, loss_fn, optimizer)
-    test(test_dataloader, model, loss_fn)
+    avg_vloss = validate(val_dataloader, model, loss_fn)
+    if avg_vloss < best_vloss:
+        best_vloss = avg_vloss
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        model_path = 'model_{}_epoch_{}'.format(timestamp, t)
+        torch.save(model.state_dict(), model_path)
 print("Done!")
 
-torch.save(model.state_dict(), "model.pth")
-print("Saved PyTorch Model State to model.pth")
+torch.save(model.state_dict(), "model_final.pth")
+print("Saved Final PyTorch Model State to model_final.pth")
 
-model = LightFormer().to(device)
-model.load_state_dict(torch.load("model.pth", weights_only=True))
+# model = LightFormer().to(device)
+# model.load_state_dict(torch.load("model.pth", weights_only=True))
 
-with torch.no_grad():
-    for i in range(10):
-        x, y = test_dataset[i]
-        x = x.to(device)
-        pred = model(x)
-        predicted, actual = int(pred[0].argmax(0).to('cpu')), y
-        if (not predicted == actual):
-            im = transforms.ToPILImage()(x)
-            im.show()
-        print(predicted is actual)
+# with torch.no_grad():
+#     for i in range(10):
+#         x, y = test_dataset[i]
+#         x = x.to(device)
+#         pred = model(x)
+#         predicted, actual = int(pred[0].argmax(0).to('cpu')), y
+#         if (not predicted == actual):
+#             im = transforms.ToPILImage()(x)
+#             im.show()
+#         print(predicted is actual)

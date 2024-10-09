@@ -42,19 +42,11 @@ class LightFormer(nn.Module):
         # Encoder
         query = self.query_embed.weight
         x = self.encoder(query, x)
-        print(x.shape)
         # MLP
         x = self.mlp(x)
-        print(x.shape)
         # Two-headed MLP
-
         x_h1, x_h2 = self.head_1(x), self.head_2(x)
-        print("x_h1 shape", x_h1.shape)
-        print("x_h2 shape", x_h2.shape)
         x_h1, x_h2 = x_h1.squeeze(), x_h2.squeeze()
-        print("SQUEEZE")
-        print("x_h1 shape", x_h1.shape)
-        print("x_h2 shape", x_h2.shape)
         # Dual Class Decoders
         st_class = self.decoder_1(x_h1)
         lf_class = self.decoder_2(x_h2)

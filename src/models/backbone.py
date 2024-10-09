@@ -1,17 +1,7 @@
 from functools import partial
 from torch import nn
 from torchvision.models import resnet18, ResNet18_Weights
-
-def _resnet_forward(self, x):
-    x = self.conv1(x)
-    x = self.bn1(x)
-    x = self.relu(x)
-    x = self.maxpool(x)
-    x = self.layer1(x)
-    x = self.layer2(x)
-    x = self.layer3(x) # C: 256
-    x = self.layer4(x) # C: 512
-    return x
+from models.identity import Identity
 
 class Backbone(nn.Module):
     def __init__(self):
@@ -22,11 +12,8 @@ class Backbone(nn.Module):
 
         # Remove last two layers: Average Pooling and Fully Connected
         self.resnet = resnet18(weights = ResNet18_Weights.IMAGENET1K_V1)
-        self.resnet.fc = None
-        self.resnet.avgpool = None
-
-        # Adjust resnet forward to reflect removed last two layers
-        self.resnet.forward = partial(_resnet_forward, self.resnet)
+        self.resnet.fc = Identity()
+        self.resnet.avgpool = Identity()
 
         # Add a downsampling step through conv relu batch sequences
         self.down_conv = nn.Sequential(
@@ -44,13 +31,9 @@ class Backbone(nn.Module):
         Returns an image feature map tensor of size batch_size, image_count, 256 channels, height-4, width-4
         """
         batch_size, image_count, channels, height, width = x.shape
-        print("Original input shape:", x.shape)
         x = x.reshape(batch_size * image_count, channels, height, width)
         x = self.resnet(x)
-        print("Resnet output shape:", x.shape)
         x = self.down_conv(x)
         _, c, h, w = x.shape
-        print("Down_Conv output shape:", x.shape)
         x = x.reshape(batch_size, image_count, c, h, w)
-        print("Backbone output shape:", x.shape)
         return x
