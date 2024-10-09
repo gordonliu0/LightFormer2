@@ -43,7 +43,7 @@ train_dataset, test_dataset, val_dataset = random_split(full_dataset,
 
 # Dataloaders
 batch_size = 16
-train_dataloader = DataLoader(train_dataset, batch_size=batch_size)
+train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
 test_dataloader = DataLoader(test_dataset, batch_size=batch_size)
 val_dataloader = DataLoader(val_dataset, batch_size=batch_size)
 
