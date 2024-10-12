@@ -46,7 +46,7 @@ class LightFormer(nn.Module):
         x = self.mlp(x)
         # Two-headed MLP
         x_h1, x_h2 = self.head_1(x), self.head_2(x)
-        x_h1, x_h2 = x_h1.squeeze(), x_h2.squeeze()
+        x_h1, x_h2 = x_h1.squeeze(1), x_h2.squeeze(1)
         # Dual Class Decoders
         st_class = self.decoder_1(x_h1)
         lf_class = self.decoder_2(x_h2)

@@ -4,49 +4,48 @@ from models import LightFormer
 from torch.utils.data import DataLoader, random_split
 from dataset import LightFormerDataset
 from torchinfo import summary
+from torch.utils.data import WeightedRandomSampler
 import os
 from datetime import datetime
 
 # Training Constants
-DIRECTORIES = [ '/Users/gordonliu/Documents/ml_projects/LightForker-2/data/Kaggle_Dataset/daySequence1',
-                '/Users/gordonliu/Documents/ml_projects/LightForker-2/data/Kaggle_Dataset/daySequence2',
-                '/Users/gordonliu/Documents/ml_projects/LightForker-2/data/Kaggle_Dataset/dayTrain/dayClip1',
-                '/Users/gordonliu/Documents/ml_projects/LightForker-2/data/Kaggle_Dataset/dayTrain/dayClip2',
-                '/Users/gordonliu/Documents/ml_projects/LightForker-2/data/Kaggle_Dataset/dayTrain/dayClip3',
-                '/Users/gordonliu/Documents/ml_projects/LightForker-2/data/Kaggle_Dataset/dayTrain/dayClip4',
-                '/Users/gordonliu/Documents/ml_projects/LightForker-2/data/Kaggle_Dataset/dayTrain/dayClip5',
-                '/Users/gordonliu/Documents/ml_projects/LightForker-2/data/Kaggle_Dataset/dayTrain/dayClip6',
-                '/Users/gordonliu/Documents/ml_projects/LightForker-2/data/Kaggle_Dataset/dayTrain/dayClip7',
-                '/Users/gordonliu/Documents/ml_projects/LightForker-2/data/Kaggle_Dataset/dayTrain/dayClip8',
-                '/Users/gordonliu/Documents/ml_projects/LightForker-2/data/Kaggle_Dataset/dayTrain/dayClip9',
-                '/Users/gordonliu/Documents/ml_projects/LightForker-2/data/Kaggle_Dataset/dayTrain/dayClip10',
-                '/Users/gordonliu/Documents/ml_projects/LightForker-2/data/Kaggle_Dataset/dayTrain/dayClip11',
-                '/Users/gordonliu/Documents/ml_projects/LightForker-2/data/Kaggle_Dataset/dayTrain/dayClip12',
-                '/Users/gordonliu/Documents/ml_projects/LightForker-2/data/Kaggle_Dataset/dayTrain/dayClip13',
-                '/Users/gordonliu/Documents/ml_projects/LightForker-2/data/Kaggle_Dataset/nightSequence1',
-                '/Users/gordonliu/Documents/ml_projects/LightForker-2/data/Kaggle_Dataset/nightSequence2',
-                '/Users/gordonliu/Documents/ml_projects/LightForker-2/data/Kaggle_Dataset/nightTrain/nightClip1',
-                '/Users/gordonliu/Documents/ml_projects/LightForker-2/data/Kaggle_Dataset/nightTrain/nightClip2',
-                '/Users/gordonliu/Documents/ml_projects/LightForker-2/data/Kaggle_Dataset/nightTrain/nightClip3',
-                '/Users/gordonliu/Documents/ml_projects/LightForker-2/data/Kaggle_Dataset/nightTrain/nightClip4',
-                '/Users/gordonliu/Documents/ml_projects/LightForker-2/data/Kaggle_Dataset/nightTrain/nightClip5',]
+LISA_DAY_DIRECTORIES = [
+    '/Users/gordonliu/Documents/ml_projects/LightForker-2/data/Kaggle_Dataset/daySequence1',
+    '/Users/gordonliu/Documents/ml_projects/LightForker-2/data/Kaggle_Dataset/daySequence2',
+    '/Users/gordonliu/Documents/ml_projects/LightForker-2/data/Kaggle_Dataset/dayTrain/dayClip1',
+    '/Users/gordonliu/Documents/ml_projects/LightForker-2/data/Kaggle_Dataset/dayTrain/dayClip2',
+    '/Users/gordonliu/Documents/ml_projects/LightForker-2/data/Kaggle_Dataset/dayTrain/dayClip3',
+    '/Users/gordonliu/Documents/ml_projects/LightForker-2/data/Kaggle_Dataset/dayTrain/dayClip4',
+    '/Users/gordonliu/Documents/ml_projects/LightForker-2/data/Kaggle_Dataset/dayTrain/dayClip5',
+    '/Users/gordonliu/Documents/ml_projects/LightForker-2/data/Kaggle_Dataset/dayTrain/dayClip6',
+    '/Users/gordonliu/Documents/ml_projects/LightForker-2/data/Kaggle_Dataset/dayTrain/dayClip7',
+    '/Users/gordonliu/Documents/ml_projects/LightForker-2/data/Kaggle_Dataset/dayTrain/dayClip8',
+    '/Users/gordonliu/Documents/ml_projects/LightForker-2/data/Kaggle_Dataset/dayTrain/dayClip9',
+    '/Users/gordonliu/Documents/ml_projects/LightForker-2/data/Kaggle_Dataset/dayTrain/dayClip10',
+    '/Users/gordonliu/Documents/ml_projects/LightForker-2/data/Kaggle_Dataset/dayTrain/dayClip11',
+    '/Users/gordonliu/Documents/ml_projects/LightForker-2/data/Kaggle_Dataset/dayTrain/dayClip12',
+    '/Users/gordonliu/Documents/ml_projects/LightForker-2/data/Kaggle_Dataset/dayTrain/dayClip13',]
+LISA_NIGHT_DIRECTORIES = [
+    '/Users/gordonliu/Documents/ml_projects/LightForker-2/data/Kaggle_Dataset/nightSequence1',
+    '/Users/gordonliu/Documents/ml_projects/LightForker-2/data/Kaggle_Dataset/nightSequence2',
+    '/Users/gordonliu/Documents/ml_projects/LightForker-2/data/Kaggle_Dataset/nightTrain/nightClip1',
+    '/Users/gordonliu/Documents/ml_projects/LightForker-2/data/Kaggle_Dataset/nightTrain/nightClip2',
+    '/Users/gordonliu/Documents/ml_projects/LightForker-2/data/Kaggle_Dataset/nightTrain/nightClip3',
+    '/Users/gordonliu/Documents/ml_projects/LightForker-2/data/Kaggle_Dataset/nightTrain/nightClip4',
+    '/Users/gordonliu/Documents/ml_projects/LightForker-2/data/Kaggle_Dataset/nightTrain/nightClip5']
 TRAIN_SPLIT = 0.8
 TEST_SPLIT  = 0.1
 VAL_SPLIT   = 0.1
 
 # Datasets
-full_dataset = LightFormerDataset(directory=DIRECTORIES)
+full_dataset = LightFormerDataset(directory=LISA_DAY_DIRECTORIES)
 generator = torch.Generator().manual_seed(42)
 train_dataset, test_dataset, val_dataset = random_split(full_dataset,
                                                         [TRAIN_SPLIT, TEST_SPLIT, VAL_SPLIT],
                                                         generator=generator)
-
-# Dataloaders
-batch_size = 16
-train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-test_dataloader = DataLoader(test_dataset, batch_size=batch_size)
-val_dataloader = DataLoader(val_dataset, batch_size=batch_size)
-
+print(tuple(full_dataset[0]['label'].tolist()))
+print(list(full_dataset[0]['label']) == [0, 1, 0, 1])
+input()
 # Check that dataset is working and labels are being pulled correctly
 # def count_classes(dataset):
 #     class0 = 0
@@ -64,9 +63,54 @@ val_dataloader = DataLoader(val_dataset, batch_size=batch_size)
 #         if y[3] == 1:
 #             class3 += 1
 #     return class0, class1, class2, class3
+# print("Start Counting Class Frequencies")
 # print(count_classes(train_dataset))
 # print(count_classes(val_dataset))
 # print(count_classes(test_dataset))
+
+# Check each type of label.
+def count_labels(dataset):
+    type0 = (1., 0., 1., 0.)
+    type1 = (1., 0., 0., 1.)
+    type2 = (0., 1., 1., 0.)
+    type3 = (0., 1., 0., 1.)
+    count0 = 0
+    count1 = 0
+    count2 = 0
+    count3 = 0
+    for data in dataset:
+        y = data['label']
+        if y[0] == 1:
+            if y[2] == 1:
+                count0 += 1
+            else:
+                count1 += 1
+        else:
+            if y[2] == 1:
+                count2 += 1
+            else:
+                count3 += 1
+    return {type0: count0, type1: count1, type2: count2, type3: count3}
+
+# Create a WeightedRandomSampler that balances label counts based in a given dataset
+def create_weighted_sampler(dataset):
+    label_counts = count_labels(dataset)
+    class_weights = {class_label: 1.0 / count for class_label, count in label_counts.items()}
+    sample_weights = [class_weights[tuple(sample["label"].tolist())] for sample in dataset]
+    return WeightedRandomSampler(sample_weights, len(sample_weights))
+
+# Dataloaders
+# batch_size = 16
+# train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+# test_dataloader = DataLoader(test_dataset, batch_size=batch_size)
+# val_dataloader = DataLoader(val_dataset, batch_size=batch_size)
+
+# Weighted Dataloaders
+batch_size = 16
+weighted_sampler = create_weighted_sampler(train_dataset)
+train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, sampler=weighted_sampler)
+test_dataloader = DataLoader(test_dataset, batch_size=batch_size)
+val_dataloader = DataLoader(val_dataset, batch_size=batch_size)
 
 # Model
 device = (
@@ -93,7 +137,7 @@ freeze_backbone(model=model)
 
 # Loss and Optimizer for Training
 loss_fn = nn.CrossEntropyLoss()
-optimizer = torch.optim.SGD(model.parameters())
+optimizer = torch.optim.Adam(model.parameters(), lr=0.0001)
 
 def train(dataloader, model, loss_fn, optimizer, batches_per_log=5):
     # Last Loss holds average loss for the last batches_per_log
