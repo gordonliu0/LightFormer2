@@ -43,26 +43,25 @@ generator = torch.Generator().manual_seed(42)
 train_dataset, test_dataset, val_dataset = random_split(full_dataset,
                                                         [TRAIN_SPLIT, TEST_SPLIT, VAL_SPLIT],
                                                         generator=generator)
-print(tuple(full_dataset[0]['label'].tolist()))
-print(list(full_dataset[0]['label']) == [0, 1, 0, 1])
-input()
+
 # Check that dataset is working and labels are being pulled correctly
-# def count_classes(dataset):
-#     class0 = 0
-#     class1 = 0
-#     class2 = 0
-#     class3 = 0
-#     for data in dataset:
-#         y = data['label']
-#         if y[0] == 1:
-#             class0 += 1
-#         if y[1] == 1:
-#             class1 += 1
-#         if y[2] == 1:
-#             class2 += 1
-#         if y[3] == 1:
-#             class3 += 1
-#     return class0, class1, class2, class3
+def count_classes(dataset):
+    class0 = 0
+    class1 = 0
+    class2 = 0
+    class3 = 0
+    for data in dataset:
+        y = data['label']
+        if y[0] == 1:
+            class0 += 1
+        if y[1] == 1:
+            class1 += 1
+        if y[2] == 1:
+            class2 += 1
+        if y[3] == 1:
+            class3 += 1
+    return class0, class1, class2, class3
+
 # print("Start Counting Class Frequencies")
 # print(count_classes(train_dataset))
 # print(count_classes(val_dataset))
@@ -93,24 +92,20 @@ def count_labels(dataset):
     return {type0: count0, type1: count1, type2: count2, type3: count3}
 
 # Create a WeightedRandomSampler that balances label counts based in a given dataset
-def create_weighted_sampler(dataset):
-    label_counts = count_labels(dataset)
+def create_weighted_sampler(dataset, label_counts = None):
+    if label_counts == None:
+        label_counts = count_labels(dataset)
+    else:
+        label_counts = {(1., 0., 1., 0.): 211, (1., 0., 0., 1.): 272, (0., 1., 1., 0.): 43, (0., 1., 0., 1.): 703}
     class_weights = {class_label: 1.0 / count for class_label, count in label_counts.items()}
     sample_weights = [class_weights[tuple(sample["label"].tolist())] for sample in dataset]
     return WeightedRandomSampler(sample_weights, len(sample_weights))
 
-# Dataloaders
-# batch_size = 16
-# train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-# test_dataloader = DataLoader(test_dataset, batch_size=batch_size)
-# val_dataloader = DataLoader(val_dataset, batch_size=batch_size)
-
-# Weighted Dataloaders
+# Weighted Dataloaders for imbalanced dataset
 batch_size = 16
 weighted_sampler = create_weighted_sampler(train_dataset)
-train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, sampler=weighted_sampler)
-test_dataloader = DataLoader(test_dataset, batch_size=batch_size)
-val_dataloader = DataLoader(val_dataset, batch_size=batch_size)
+train_dataloader = DataLoader(train_dataset, batch_size=batch_size, sampler=weighted_sampler)
+val_dataloader = DataLoader(val_dataset, batch_size=batch_size) # val doesn't need resampling
 
 # Model
 device = (
@@ -213,32 +208,19 @@ def validate(dataloader, model, loss_fn):
     print(f"Test Error: \n Straight Accuracy: {(100*st_accuracy):>0.1f}%, Left Accuracy: {(100*lf_accuracy):>0.1f}%, Average validation loss: {val_loss:>8f} \n")
     return val_loss
 
-epochs = 10
-for t in range(epochs):
+def run_training(epochs):
     best_vloss = 1000000
-    print(f"Epoch {t+1}\n-------------------------------")
-    train(train_dataloader, model, loss_fn, optimizer)
-    avg_vloss = validate(val_dataloader, model, loss_fn)
-    if avg_vloss < best_vloss:
-        best_vloss = avg_vloss
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        model_path = 'model_{}_epoch_{}'.format(timestamp, t)
-        torch.save(model.state_dict(), model_path)
-print("Done!")
+    for t in range(epochs):
+        print(f"Epoch {t+1}\n-------------------------------")
+        train(train_dataloader, model, loss_fn, optimizer)
+        avg_vloss = validate(val_dataloader, model, loss_fn)
+        if avg_vloss < best_vloss:
+            best_vloss = avg_vloss
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            model_path = 'checkpoints/time_{}_epoch_{}'.format(timestamp, t)
+            torch.save(model.state_dict(), model_path)
+    print("Done!")
+    torch.save(model.state_dict(), "checkpoints/model_final.pth")
+    print("Saved Final PyTorch Model State to model_final.pth")
 
-torch.save(model.state_dict(), "model_final.pth")
-print("Saved Final PyTorch Model State to model_final.pth")
-
-# model = LightFormer().to(device)
-# model.load_state_dict(torch.load("model.pth", weights_only=True))
-
-# with torch.no_grad():
-#     for i in range(10):
-#         x, y = test_dataset[i]
-#         x = x.to(device)
-#         pred = model(x)
-#         predicted, actual = int(pred[0].argmax(0).to('cpu')), y
-#         if (not predicted == actual):
-#             im = transforms.ToPILImage()(x)
-#             im.show()
-#         print(predicted is actual)
+run_training(epochs = 5)
