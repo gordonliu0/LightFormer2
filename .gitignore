@@ -11,6 +11,9 @@ imgs/*
 # Ignore dataset files
 # data/Kaggle_Dataset
 
+# Ignore checkpoints
+**/checkpoints/**
+
 # Ignore any images inside frames directories
 **/frames/**
 
@@ -22,3 +25,5 @@ Thumbs.db
 __pycache__/
 *.py[cod]
 *$py.class
+
+# Ignore
