@@ -22,5 +22,4 @@ class Decoder(nn.Module):
 
     def forward(self, x):
         arcface = self.sub_arcface(x)
-        res = F.softmax(arcface, dim=1)
-        return res
+        return arcface
