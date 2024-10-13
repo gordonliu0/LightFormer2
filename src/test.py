@@ -7,34 +7,38 @@ from torchvision.transforms.functional import invert
 import os
 
 # Training Constants
-DIRECTORIES = [ '/Users/gordonliu/Documents/ml_projects/LightForker-2/data/Kaggle_Dataset/daySequence1',
-                '/Users/gordonliu/Documents/ml_projects/LightForker-2/data/Kaggle_Dataset/daySequence2',
-                '/Users/gordonliu/Documents/ml_projects/LightForker-2/data/Kaggle_Dataset/dayTrain/dayClip1',
-                '/Users/gordonliu/Documents/ml_projects/LightForker-2/data/Kaggle_Dataset/dayTrain/dayClip2',
-                '/Users/gordonliu/Documents/ml_projects/LightForker-2/data/Kaggle_Dataset/dayTrain/dayClip3',
-                '/Users/gordonliu/Documents/ml_projects/LightForker-2/data/Kaggle_Dataset/dayTrain/dayClip4',
-                '/Users/gordonliu/Documents/ml_projects/LightForker-2/data/Kaggle_Dataset/dayTrain/dayClip5',
-                '/Users/gordonliu/Documents/ml_projects/LightForker-2/data/Kaggle_Dataset/dayTrain/dayClip6',
-                '/Users/gordonliu/Documents/ml_projects/LightForker-2/data/Kaggle_Dataset/dayTrain/dayClip7',
-                '/Users/gordonliu/Documents/ml_projects/LightForker-2/data/Kaggle_Dataset/dayTrain/dayClip8',
-                '/Users/gordonliu/Documents/ml_projects/LightForker-2/data/Kaggle_Dataset/dayTrain/dayClip9',
-                '/Users/gordonliu/Documents/ml_projects/LightForker-2/data/Kaggle_Dataset/dayTrain/dayClip10',
-                '/Users/gordonliu/Documents/ml_projects/LightForker-2/data/Kaggle_Dataset/dayTrain/dayClip11',
-                '/Users/gordonliu/Documents/ml_projects/LightForker-2/data/Kaggle_Dataset/dayTrain/dayClip12',
-                '/Users/gordonliu/Documents/ml_projects/LightForker-2/data/Kaggle_Dataset/dayTrain/dayClip13',
-                '/Users/gordonliu/Documents/ml_projects/LightForker-2/data/Kaggle_Dataset/nightSequence1',
-                '/Users/gordonliu/Documents/ml_projects/LightForker-2/data/Kaggle_Dataset/nightSequence2',
-                '/Users/gordonliu/Documents/ml_projects/LightForker-2/data/Kaggle_Dataset/nightTrain/nightClip1',
-                '/Users/gordonliu/Documents/ml_projects/LightForker-2/data/Kaggle_Dataset/nightTrain/nightClip2',
-                '/Users/gordonliu/Documents/ml_projects/LightForker-2/data/Kaggle_Dataset/nightTrain/nightClip3',
-                '/Users/gordonliu/Documents/ml_projects/LightForker-2/data/Kaggle_Dataset/nightTrain/nightClip4',
-                '/Users/gordonliu/Documents/ml_projects/LightForker-2/data/Kaggle_Dataset/nightTrain/nightClip5',]
+LISA_DAY_DIRECTORIES = [
+    '/Users/gordonliu/Documents/ml_projects/LightForker-2/data/Kaggle_Dataset/daySequence1',
+    '/Users/gordonliu/Documents/ml_projects/LightForker-2/data/Kaggle_Dataset/daySequence2',
+    '/Users/gordonliu/Documents/ml_projects/LightForker-2/data/Kaggle_Dataset/dayTrain/dayClip1',
+    '/Users/gordonliu/Documents/ml_projects/LightForker-2/data/Kaggle_Dataset/dayTrain/dayClip2',
+    '/Users/gordonliu/Documents/ml_projects/LightForker-2/data/Kaggle_Dataset/dayTrain/dayClip3',
+    '/Users/gordonliu/Documents/ml_projects/LightForker-2/data/Kaggle_Dataset/dayTrain/dayClip4',
+    '/Users/gordonliu/Documents/ml_projects/LightForker-2/data/Kaggle_Dataset/dayTrain/dayClip5',
+    '/Users/gordonliu/Documents/ml_projects/LightForker-2/data/Kaggle_Dataset/dayTrain/dayClip6',
+    '/Users/gordonliu/Documents/ml_projects/LightForker-2/data/Kaggle_Dataset/dayTrain/dayClip7',
+    '/Users/gordonliu/Documents/ml_projects/LightForker-2/data/Kaggle_Dataset/dayTrain/dayClip8',
+    '/Users/gordonliu/Documents/ml_projects/LightForker-2/data/Kaggle_Dataset/dayTrain/dayClip9',
+    '/Users/gordonliu/Documents/ml_projects/LightForker-2/data/Kaggle_Dataset/dayTrain/dayClip10',
+    '/Users/gordonliu/Documents/ml_projects/LightForker-2/data/Kaggle_Dataset/dayTrain/dayClip11',
+    '/Users/gordonliu/Documents/ml_projects/LightForker-2/data/Kaggle_Dataset/dayTrain/dayClip12',
+    '/Users/gordonliu/Documents/ml_projects/LightForker-2/data/Kaggle_Dataset/dayTrain/dayClip13',]
+LISA_NIGHT_DIRECTORIES = [
+    '/Users/gordonliu/Documents/ml_projects/LightForker-2/data/Kaggle_Dataset/nightSequence1',
+    '/Users/gordonliu/Documents/ml_projects/LightForker-2/data/Kaggle_Dataset/nightSequence2',
+    '/Users/gordonliu/Documents/ml_projects/LightForker-2/data/Kaggle_Dataset/nightTrain/nightClip1',
+    '/Users/gordonliu/Documents/ml_projects/LightForker-2/data/Kaggle_Dataset/nightTrain/nightClip2',
+    '/Users/gordonliu/Documents/ml_projects/LightForker-2/data/Kaggle_Dataset/nightTrain/nightClip3',
+    '/Users/gordonliu/Documents/ml_projects/LightForker-2/data/Kaggle_Dataset/nightTrain/nightClip4',
+    '/Users/gordonliu/Documents/ml_projects/LightForker-2/data/Kaggle_Dataset/nightTrain/nightClip5']
 TRAIN_SPLIT = 0.8
 TEST_SPLIT  = 0.1
 VAL_SPLIT   = 0.1
+MODEL_CHECKPOINT = "checkpoints/time_20241013_123514_epoch_2loss_1.5260892629623413"
+VERBOSE = True
 
 # Datasets
-full_dataset = LightFormerDataset(directory=DIRECTORIES)
+full_dataset = LightFormerDataset(directory=LISA_DAY_DIRECTORIES)
 generator = torch.Generator().manual_seed(42)
 train_dataset, test_dataset, val_dataset = random_split(full_dataset,
                                                         [TRAIN_SPLIT, TEST_SPLIT, VAL_SPLIT],
@@ -56,7 +60,7 @@ print(f'Using device "{device}"')
 if device == "mps":
     os.environ['PYTORCH_ENABLE_MPS_FALLBACK'] = '1' # used to provide fallback if MPS
 model = LightFormer().to(device)
-model.load_state_dict(torch.load("model_final.pth", weights_only=True))
+model.load_state_dict(torch.load(MODEL_CHECKPOINT, weights_only=True))
 model.eval()
 
 # untransform image for display
@@ -72,6 +76,8 @@ def untransform(image, mean, std, scale):
     return a
 
 with torch.no_grad():
+    count_st_correct = 0
+    count_lf_correct = 0
     for test_index, test_data in enumerate(test_dataloader):
         # grab data
         name = test_data['name'][0]
@@ -85,20 +91,27 @@ with torch.no_grad():
         st_class, lf_class = model(x)
         st_pred, lf_pred = int(st_class[0].argmax(0).to('cpu')), int(lf_class[0].argmax(0).to('cpu'))
         st_actual, lf_actual = y[0].argmax(0).item(), y[1].argmax(0).item()
-        print(st_class, lf_class)
         # compare
         st_correct = st_pred == st_actual
         lf_correct = lf_pred == lf_actual
 
+        # gather data
+        count_st_correct += st_correct
+        count_lf_correct += lf_correct
+
         # print
-        if test_index % 20 == 0:
-            print("-"*(8+30+6+6+40))
-            print(f"|{"NAME":<30}|{"st":>6}|{"lf":>6}|{"st_pred":>10}|{"st_actual":>10}|{"lf_pred":>10}|{"lf_actual":>10}|")
-            print("-"*(8+30+6+6+40))
-        print(f"|{name:<30}|{str(st_correct):>6}|{str(lf_correct):>6}|{st_pred:>10}|{st_actual:>10}|{lf_pred:>10}|{lf_actual:>10}|")
+        if VERBOSE:
+            if test_index % 20 == 0:
+                print("-"*(8+30+6+6+40))
+                print(f"|{"NAME":<30}|{"st":>6}|{"lf":>6}|{"st_pred":>10}|{"st_actual":>10}|{"lf_pred":>10}|{"lf_actual":>10}|")
+                print("-"*(8+30+6+6+40))
+            print(f"|{name:<30}|{str(st_correct):>6}|{str(lf_correct):>6}|{st_pred:>10}|{st_actual:>10}|{lf_pred:>10}|{lf_actual:>10}|")
+
 
         # Display for debug
         # if not (st_correct and lf_correct):
         #     im = transforms.ToPILImage()(final_image)
         #     im = im.open()
 
+    print(f"Correct Straight: {count_st_correct}/{len(test_dataset)}")
+    print(f"Correct Left: {count_lf_correct}/{len(test_dataset)}")

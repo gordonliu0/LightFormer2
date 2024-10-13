@@ -7,6 +7,7 @@ from torchinfo import summary
 from torch.utils.data import WeightedRandomSampler
 import os
 from datetime import datetime
+from src.util import run_with_animation
 
 # Training Constants
 LISA_DAY_DIRECTORIES = [
@@ -37,12 +38,9 @@ TRAIN_SPLIT = 0.8
 TEST_SPLIT  = 0.1
 VAL_SPLIT   = 0.1
 
-# Datasets
-full_dataset = LightFormerDataset(directory=LISA_DAY_DIRECTORIES)
-generator = torch.Generator().manual_seed(42)
-train_dataset, test_dataset, val_dataset = random_split(full_dataset,
-                                                        [TRAIN_SPLIT, TEST_SPLIT, VAL_SPLIT],
-                                                        generator=generator)
+####################################################################################
+############################         Datasets           ############################
+####################################################################################
 
 # Check that dataset is working and labels are being pulled correctly
 def count_classes(dataset):
@@ -61,11 +59,6 @@ def count_classes(dataset):
         if y[3] == 1:
             class3 += 1
     return class0, class1, class2, class3
-
-# print("Start Counting Class Frequencies")
-# print(count_classes(train_dataset))
-# print(count_classes(val_dataset))
-# print(count_classes(test_dataset))
 
 # Check each type of label.
 def count_labels(dataset):
@@ -94,16 +87,28 @@ def count_labels(dataset):
 # Create a WeightedRandomSampler that balances label counts based in a given dataset
 def create_weighted_sampler(dataset, label_counts = None):
     if label_counts == None:
-        label_counts = count_labels(dataset)
-    else:
         label_counts = {(1., 0., 1., 0.): 211, (1., 0., 0., 1.): 272, (0., 1., 1., 0.): 43, (0., 1., 0., 1.): 703}
+    else:
+        label_counts = count_labels(dataset)
     class_weights = {class_label: 1.0 / count for class_label, count in label_counts.items()}
     sample_weights = [class_weights[tuple(sample["label"].tolist())] for sample in dataset]
     return WeightedRandomSampler(sample_weights, len(sample_weights))
 
+
+full_dataset = LightFormerDataset(directory=LISA_DAY_DIRECTORIES)
+generator = torch.Generator().manual_seed(42)
+train_dataset, test_dataset, val_dataset = random_split(full_dataset,
+                                                        [TRAIN_SPLIT, TEST_SPLIT, VAL_SPLIT],
+                                                        generator=generator)
+
+# print("Start Counting Class Frequencies")
+# print(count_classes(train_dataset))
+# print(count_classes(val_dataset))
+# print(count_classes(test_dataset))
+
 # Weighted Dataloaders for imbalanced dataset
 batch_size = 16
-weighted_sampler = create_weighted_sampler(train_dataset)
+weighted_sampler = run_with_animation(f=create_weighted_sampler,args=(train_dataset,), name='Weighted Sampler')
 train_dataloader = DataLoader(train_dataset, batch_size=batch_size, sampler=weighted_sampler)
 val_dataloader = DataLoader(val_dataset, batch_size=batch_size) # val doesn't need resampling
 
@@ -118,6 +123,7 @@ device = (
 print(f'Using device "{device}"')
 if device == "mps":
     os.environ['PYTORCH_ENABLE_MPS_FALLBACK'] = '1' # used to provide fallback if MPS
+print(os.environ['PYTORCH_ENABLE_MPS_FALLBACK'])
 model = LightFormer().to(device)
 
 # Freeze Resnet Layers
@@ -209,18 +215,20 @@ def validate(dataloader, model, loss_fn):
     return val_loss
 
 def run_training(epochs):
-    best_vloss = 1000000
+    # best_vloss = 1000000
+    avg_vloss = validate(val_dataloader, model, loss_fn)
     for t in range(epochs):
         print(f"Epoch {t+1}\n-------------------------------")
         train(train_dataloader, model, loss_fn, optimizer)
         avg_vloss = validate(val_dataloader, model, loss_fn)
-        if avg_vloss < best_vloss:
-            best_vloss = avg_vloss
-            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-            model_path = 'checkpoints/time_{}_epoch_{}'.format(timestamp, t)
-            torch.save(model.state_dict(), model_path)
-    print("Done!")
-    torch.save(model.state_dict(), "checkpoints/model_final.pth")
-    print("Saved Final PyTorch Model State to model_final.pth")
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        model_path = 'checkpoints/time_{}_epoch_{}loss_{}'.format(timestamp, t, avg_vloss)
+        torch.save(model.state_dict(), model_path)
+        # if avg_vloss < best_vloss:
+        #     best_vloss = avg_vloss
+
+    print(f"🎉 Finished training {epochs} epochs for LightFormer2!")
+    # torch.save(model.state_dict(), "checkpoints/model_final.pth")
+    # print("Saved Final PyTorch Model State to model_final.pth")
 
 run_training(epochs = 5)
