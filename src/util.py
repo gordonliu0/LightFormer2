@@ -25,7 +25,7 @@ def run_with_animation(f, args=(), kwargs={}, animation_chars=AnimationSequence.
         start_time = time.time()
         future = executor.submit(f, *args, **kwargs)
         while not future.done():
-            animated_loading(animation_chars)
+            animated_loading(animation_chars.value)
         sys.stdout.write('\r' + ' ' * 20 + '\r')
         sys.stdout.flush()
         end_time = time.time()

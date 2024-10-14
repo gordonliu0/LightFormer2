@@ -34,8 +34,8 @@ LISA_NIGHT_DIRECTORIES = [
 TRAIN_SPLIT = 0.8
 TEST_SPLIT  = 0.1
 VAL_SPLIT   = 0.1
-MODEL_CHECKPOINT = "checkpoints/time_20241013_123514_epoch_2loss_1.5260892629623413"
-VERBOSE = True
+MODEL_CHECKPOINT = "/Users/gordonliu/Documents/ml_projects/LightForker-2/src/checkpoints/time_20241014_054238_epoch_13loss_1.110802173614502"
+VERBOSE = False
 
 # Datasets
 full_dataset = LightFormerDataset(directory=LISA_DAY_DIRECTORIES)

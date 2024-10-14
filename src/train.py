@@ -7,9 +7,12 @@ from torchinfo import summary
 from torch.utils.data import WeightedRandomSampler
 import os
 from datetime import datetime
-from src.util import run_with_animation
+from util import run_with_animation
 
 # Training Constants
+LEARNING_RATE = 5e-6 # empirically determined from learning_rate_finder
+
+# Dataset Constants
 LISA_DAY_DIRECTORIES = [
     '/Users/gordonliu/Documents/ml_projects/LightForker-2/data/Kaggle_Dataset/daySequence1',
     '/Users/gordonliu/Documents/ml_projects/LightForker-2/data/Kaggle_Dataset/daySequence2',
@@ -37,10 +40,6 @@ LISA_NIGHT_DIRECTORIES = [
 TRAIN_SPLIT = 0.8
 TEST_SPLIT  = 0.1
 VAL_SPLIT   = 0.1
-
-####################################################################################
-############################         Datasets           ############################
-####################################################################################
 
 # Check that dataset is working and labels are being pulled correctly
 def count_classes(dataset):
@@ -138,7 +137,7 @@ freeze_backbone(model=model)
 
 # Loss and Optimizer for Training
 loss_fn = nn.CrossEntropyLoss()
-optimizer = torch.optim.Adam(model.parameters(), lr=0.0001)
+optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
 
 def train(dataloader, model, loss_fn, optimizer, batches_per_log=5):
     # Last Loss holds average loss for the last batches_per_log
@@ -231,4 +230,4 @@ def run_training(epochs):
     # torch.save(model.state_dict(), "checkpoints/model_final.pth")
     # print("Saved Final PyTorch Model State to model_final.pth")
 
-run_training(epochs = 5)
+run_training(epochs = 15)
