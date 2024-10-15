@@ -8,9 +8,6 @@
 imgs
 imgs/*
 
-# Ignore dataset files
-# data/Kaggle_Dataset
-
 # Ignore checkpoints
 **/checkpoints/**
 
