@@ -1,5 +1,6 @@
 import torch
 from torch import nn
+from checkpointer import ModelCheckpointer
 from models import LightFormer
 from torch.utils.data import DataLoader, random_split
 from dataset import LightFormerDataset
@@ -9,10 +10,7 @@ import os
 from datetime import datetime
 from util import run_with_animation
 
-# Training Constants
-LEARNING_RATE = 5e-6 # empirically determined from learning_rate_finder
-
-# Dataset Constants
+# Constants
 LISA_DAY_DIRECTORIES = [
     '/Users/gordonliu/Documents/ml_projects/LightForker-2/data/Kaggle_Dataset/daySequence1',
     '/Users/gordonliu/Documents/ml_projects/LightForker-2/data/Kaggle_Dataset/daySequence2',
@@ -41,8 +39,18 @@ TRAIN_SPLIT = 0.8
 TEST_SPLIT  = 0.1
 VAL_SPLIT   = 0.1
 
-# Check that dataset is working and labels are being pulled correctly
+# Training Hyperparameters
+LEARNING_RATE = 5e-6 # empirically determined from learning_rate_finder
+EPOCHS = 15
+BATCH_SIZE = 16
+
 def count_classes(dataset):
+    'Count each type of class in the dataset.'
+    # Example Usage:
+    # print("Start Counting Class Frequencies")
+    # print(count_classes(train_dataset))
+    # print(count_classes(val_dataset))
+    # print(count_classes(test_dataset))
     class0 = 0
     class1 = 0
     class2 = 0
@@ -59,8 +67,8 @@ def count_classes(dataset):
             class3 += 1
     return class0, class1, class2, class3
 
-# Check each type of label.
 def count_labels(dataset):
+    'Count each type of label in the dataset.'
     type0 = (1., 0., 1., 0.)
     type1 = (1., 0., 0., 1.)
     type2 = (0., 1., 1., 0.)
@@ -83,35 +91,27 @@ def count_labels(dataset):
                 count3 += 1
     return {type0: count0, type1: count1, type2: count2, type3: count3}
 
-# Create a WeightedRandomSampler that balances label counts based in a given dataset
-def create_weighted_sampler(dataset, label_counts = None):
-    if label_counts == None:
-        label_counts = {(1., 0., 1., 0.): 211, (1., 0., 0., 1.): 272, (0., 1., 1., 0.): 43, (0., 1., 0., 1.): 703}
-    else:
-        label_counts = count_labels(dataset)
+def create_weighted_sampler(dataset):
+    'Weighted samplers help with unbalanced datasets.'
+    # label_counts = count_labels(dataset)
+    label_counts = {(1., 0., 1., 0.): 211, (1., 0., 0., 1.): 272, (0., 1., 1., 0.): 43, (0., 1., 0., 1.): 703}
     class_weights = {class_label: 1.0 / count for class_label, count in label_counts.items()}
     sample_weights = [class_weights[tuple(sample["label"].tolist())] for sample in dataset]
     return WeightedRandomSampler(sample_weights, len(sample_weights))
 
-
+# Dataset, Dataloader
 full_dataset = LightFormerDataset(directory=LISA_DAY_DIRECTORIES)
 generator = torch.Generator().manual_seed(42)
 train_dataset, test_dataset, val_dataset = random_split(full_dataset,
                                                         [TRAIN_SPLIT, TEST_SPLIT, VAL_SPLIT],
                                                         generator=generator)
-
-# print("Start Counting Class Frequencies")
-# print(count_classes(train_dataset))
-# print(count_classes(val_dataset))
-# print(count_classes(test_dataset))
-
-# Weighted Dataloaders for imbalanced dataset
-batch_size = 16
 weighted_sampler = run_with_animation(f=create_weighted_sampler,args=(train_dataset,), name='Weighted Sampler')
-train_dataloader = DataLoader(train_dataset, batch_size=batch_size, sampler=weighted_sampler)
-val_dataloader = DataLoader(val_dataset, batch_size=batch_size) # val doesn't need resampling
+train_dataloader = DataLoader(train_dataset, batch_size=BATCH_SIZE, sampler=weighted_sampler)
+val_dataloader = DataLoader(val_dataset, batch_size=BATCH_SIZE) # val doesn't need resampling
 
-# Model
+# Setup Device, Model, Loss, Optimizer, Checkpointer
+# To view a summary, run summary(model, input_size=(batch_size, 10, 3, 512, 960)).
+# ** Note: Don't run this before a training job. **
 device = (
     "cuda"
     if torch.cuda.is_available()
@@ -119,26 +119,14 @@ device = (
     if torch.backends.mps.is_available()
     else "cpu"
 )
-print(f'Using device "{device}"')
-if device == "mps":
-    os.environ['PYTORCH_ENABLE_MPS_FALLBACK'] = '1' # used to provide fallback if MPS
-print(os.environ['PYTORCH_ENABLE_MPS_FALLBACK'])
 model = LightFormer().to(device)
-
-# Freeze Resnet Layers
-def freeze_backbone(model):
-    for param in model.backbone.resnet.parameters():
-        param.requires_grad = False
-freeze_backbone(model=model)
-
-# LightFormer Summary
-# print(model)
-# summary(model, input_size=(batch_size, 10, 3, 512, 960))
-
-# Loss and Optimizer for Training
+for param in model.backbone.resnet.parameters(): # freeze resnet
+    param.requires_grad = False
 loss_fn = nn.CrossEntropyLoss()
 optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
+checkpointer = ModelCheckpointer('checkpoints', max_saves=5)
 
+# Training, Validation, and Training Loop
 def train(dataloader, model, loss_fn, optimizer, batches_per_log=5):
     # Last Loss holds average loss for the last batches_per_log
     st = { 'running_loss': 0., 'last_loss': 0.}
@@ -213,21 +201,14 @@ def validate(dataloader, model, loss_fn):
     print(f"Test Error: \n Straight Accuracy: {(100*st_accuracy):>0.1f}%, Left Accuracy: {(100*lf_accuracy):>0.1f}%, Average validation loss: {val_loss:>8f} \n")
     return val_loss
 
-def run_training(epochs):
-    # best_vloss = 1000000
-    avg_vloss = validate(val_dataloader, model, loss_fn)
-    for t in range(epochs):
-        print(f"Epoch {t+1}\n-------------------------------")
+def run_training():
+    for t in range(EPOCHS):
         train(train_dataloader, model, loss_fn, optimizer)
-        avg_vloss = validate(val_dataloader, model, loss_fn)
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        model_path = 'checkpoints/time_{}_epoch_{}loss_{}'.format(timestamp, t, avg_vloss)
-        torch.save(model.state_dict(), model_path)
-        # if avg_vloss < best_vloss:
-        #     best_vloss = avg_vloss
+        metric = validate(val_dataloader, model, loss_fn)
+        checkpointer.save_checkpoint(model, epoch=t, metric=metric)
 
-    print(f"🎉 Finished training {epochs} epochs for LightFormer2!")
+    print(f"🎉 Finished training {EPOCHS} epochs for LightFormer2!")
     # torch.save(model.state_dict(), "checkpoints/model_final.pth")
     # print("Saved Final PyTorch Model State to model_final.pth")
 
-run_training(epochs = 15)
+run_training()
