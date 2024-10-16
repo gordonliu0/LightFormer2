@@ -71,6 +71,8 @@ class WarmupCosineScheduler():
             milestones=[warmup_steps]
         )
 
+
+# lr_scheduler Visualizer
 def main():
     # Define a simple model (for demonstration purposes)
     model = torch.nn.Linear(10, 1)
@@ -105,4 +107,5 @@ def main():
     plt.title('Learning Rate vs. Epoch')
     plt.show()
 
-main()
+if __name__ == "__main__":
+    main()
