@@ -1,4 +1,6 @@
 import torch
+import torch.optim as optim
+import matplotlib.pyplot as plt
 from torch.optim import Optimizer
 from torch.optim.lr_scheduler import LinearLR, CosineAnnealingWarmRestarts, SequentialLR
 
@@ -16,7 +18,10 @@ class WarmupCosineScheduler():
         self.scheduler = self._create_warmup_cosine_scheduler(optimizer, warmup_steps, warmup_start_factor, warmup_end_factor, T_0, T_mult, eta_min)
 
     def step(self):
-        self.scheduler()
+        self.scheduler.step()
+
+    def get_last_lr(self):
+        return self.scheduler.get_last_lr()
 
     def _create_warmup_cosine_scheduler(
         self,
@@ -66,3 +71,38 @@ class WarmupCosineScheduler():
             milestones=[warmup_steps]
         )
 
+def main():
+    # Define a simple model (for demonstration purposes)
+    model = torch.nn.Linear(10, 1)
+
+    # Create an optimizer
+    optimizer = optim.Adam(model.parameters(), lr=1e-2)
+
+    # Create a learning rate scheduler
+    scheduler = WarmupCosineScheduler(optimizer=optimizer, warmup_steps=4, warmup_start_factor=0.001, warmup_end_factor=1, T_0=1, T_mult=2)
+
+    # Number of epochs
+    num_epochs = 32
+
+    # List to store learning rates
+    lrs = []
+
+    # Simulate training loop
+    for epoch in range(num_epochs):
+        # Your training code would go here
+
+        # Step the scheduler
+        scheduler.step()
+
+        # Append the current learning rate
+        lrs.append(scheduler.get_last_lr()[0])  # get_last_lr() returns a list, so we take the first element
+
+    # Plot the learning rates
+    plt.plot(lrs)
+    plt.xlabel('Epoch')
+    plt.ylabel('Learning Rate')
+    plt.grid()
+    plt.title('Learning Rate vs. Epoch')
+    plt.show()
+
+main()

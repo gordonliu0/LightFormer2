@@ -2,6 +2,8 @@ import torch
 from torch import nn
 from torch.utils.data import DataLoader, random_split, WeightedRandomSampler
 from torchinfo import summary
+from torch.utils.tensorboard import SummaryWriter
+
 from models import LightFormer
 from checkpointer import ModelCheckpointer
 from lr_scheduler import WarmupCosineScheduler
@@ -9,6 +11,7 @@ from dataset import LightFormerDataset
 from util import run_with_animation
 
 # Constants
+VERBOSE = True
 LISA_DAY_DIRECTORIES = [
     '/Users/gordonliu/Documents/ml_projects/LightForker-2/data/Kaggle_Dataset/daySequence1',
     '/Users/gordonliu/Documents/ml_projects/LightForker-2/data/Kaggle_Dataset/daySequence2',
@@ -39,10 +42,29 @@ VAL_SPLIT   = 0.1
 
 # Training Hyperparameters
 # LEARNING_RATE = 5e-6 # empirically determined from learning_rate_finder
+
+# Learning Rate Scheduler: Warmup + SGDR
 LEARNING_RATE = 1e-2
-EPOCHS = 19 # 4 Warmup + 15 (1 + 2 + 4 + 8) SGDR
-# EPOCHS = 35 # 4 Warmup + 31 (1 + 2 + 4 + 8 + 16) SGDR
+
+WARMUP_STEPS = 4
+EPOCHS = 20 # 4 Warmup + 16 SGDR (broken into (1 + 1 + 2 + 4 + 8) steps)
+# EPOCHS = 36 # 4 Warmup + 32 SGDR (broken into (1 + 1 + 2 + 4 + 8 + 16) steps)
+
+# WARMUP_STEPS = 2
+# EPOCHS = 18 # 2 Warmup + 16 SGDR (broken into (1 + 1 + 2 + 4 + 8) steps)
+# EPOCHS = 34 # 2 Warmup + 32 SGDR (broken into (1 + 1 + 2 + 4 + 8 + 16) steps)
+
+# WARMUP_STEPS = 1
+# EPOCHS = 33 # 1 Warmup + 32 SGDR (broken into (1 + 1 + 2 + 4 + 8 + 16) steps)
+# EPOCHS = 17 # 1 Warmup + 16 SGDR (broken into (1 + 1 + 2 + 4 + 8) steps)
+
+# WARMUP_STEPS = 0
+# EPOCHS = 32 # 0 Warmup + 32 SGDR (broken into (1 + 1 + 2 + 4 + 8 + 16) steps)
+# EPOCHS = 16 # 0 Warmup + 16 SGDR (broken into (1 + 1 + 2 + 4 + 8) steps)
+
 BATCH_SIZE = 16
+
+# Dataset Functions
 
 def count_classes(dataset):
     'Count each type of class in the dataset.'
@@ -109,7 +131,7 @@ weighted_sampler = run_with_animation(f=create_weighted_sampler,args=(train_data
 train_dataloader = DataLoader(train_dataset, batch_size=BATCH_SIZE, sampler=weighted_sampler)
 val_dataloader = DataLoader(val_dataset, batch_size=BATCH_SIZE) # val doesn't need resampling
 
-# Setup Device, Model, Loss, Optimizer, Checkpointer, LR Scheduler
+# Setup Device, Model, Loss, Optimizer, Checkpointer, LR Scheduler, Tensorboard Writer
 # To view a summary, run summary(model, input_size=(batch_size, 10, 3, 512, 960)).
 # ** Note: Don't run this before a training job. **
 device = (
@@ -123,12 +145,25 @@ model = LightFormer().to(device)
 for param in model.backbone.resnet.parameters(): # freeze resnet
     param.requires_grad = False
 loss_fn = nn.CrossEntropyLoss()
+val_loss_fn = nn.CrossEntropyLoss(reduction='sum')
 optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
 checkpointer = ModelCheckpointer('checkpoints', max_saves=5)
 scheduler = WarmupCosineScheduler(optimizer=optimizer, warmup_steps=4, warmup_start_factor=0.001, warmup_end_factor=1, T_0=1, T_mult=2)
+writer = SummaryWriter()
 
 # Training, Validation, and Training Loop
-def train(dataloader, model, loss_fn, optimizer, batches_per_log=5):
+def train(dataloader, model, loss_fn, optimizer, global_step, batches_per_log=5):
+    '''
+    Run a training epoch.
+
+    Args:
+        dataloader: Dataloader instance used in training steps.
+        model: Pytorch model to use in training backpropagation.
+        loss_fn: Loss function to optimize for.
+        optimizer: Pytorch optimizer controlling training backpropagation.
+        global_step: Mutable list that holds global step count.
+        batches_per_log: How many batches for every log. Only prints if VERBOSE = True.
+    '''
     # Last Loss holds average loss for the last batches_per_log
     st = { 'running_loss': 0., 'last_loss': 0.}
     lf = { 'running_loss': 0., 'last_loss': 0.}
@@ -160,9 +195,14 @@ def train(dataloader, model, loss_fn, optimizer, batches_per_log=5):
         lf['running_loss'] += lf_loss.item()
         total['running_loss'] += total_loss.item()
 
-        print(f'{batch_index}', end=' ', flush=True)
+        writer.add_scalar("Loss/train/st", st_loss.item(), global_step[0])
+        writer.add_scalar("Loss/train/lf", lf_loss.item(), global_step[0])
+        writer.add_scalar("Loss/train/total", total_loss.item(), global_step[0])
+        global_step[0] += 1
 
-        if (batch_index+1) % batches_per_log == 0:
+        print(f'Current Step: {batch_index}, Global Step: {global_step[0]}')
+
+        if VERBOSE and ((batch_index+1) % batches_per_log == 0):
             current_sample_index = (batch_index + 1) * len(X)
             st['last_loss'] = st['running_loss'] / batches_per_log
             lf['last_loss'] = lf['running_loss'] / batches_per_log
@@ -173,11 +213,20 @@ def train(dataloader, model, loss_fn, optimizer, batches_per_log=5):
             lf['running_loss'] = 0
             total['running_loss'] = 0
 
-def validate(dataloader, model, loss_fn):
+def validate(dataloader, model, loss_fn, epoch):
+    '''
+    Run a validation step.
+
+    Args:
+        dataloader: Dataloader instance used in validation.
+        model: Pytorch model to use for validation.
+        loss_fn: Loss function to calculate loss.
+        epoch: Current epoch.
+    '''
     size = len(dataloader.dataset)
     num_batches = len(dataloader)
     model.eval()
-    val_loss, st_correct, lf_correct,  = 0, 0, 0
+    st_loss, lf_loss, total_loss, st_accuracy, lf_accuracy = 0, 0, 0, 0, 0, 0
     with torch.no_grad():
         for batch in dataloader:
             # Load sample and label
@@ -188,28 +237,44 @@ def validate(dataloader, model, loss_fn):
             st_class, lf_class = model(X)
 
             # Compute loss
-            st_loss = loss_fn(st_class, y[0])
-            lf_loss = loss_fn(lf_class, y[1])
-            total_loss = st_loss+lf_loss
+            step_st_loss = loss_fn(st_class, y[0])
+            step_lf_loss = loss_fn(lf_class, y[1])
+            step_total_loss = step_st_loss+step_lf_loss
 
             # Gather data
-            val_loss += total_loss.item()
-            st_correct += (st_class.argmax(1) == y[0].argmax(1)).type(torch.float).sum().item()
-            lf_correct += (lf_class.argmax(1) == y[1].argmax(1)).type(torch.float).sum().item()
-    val_loss /= num_batches
-    st_accuracy = st_correct/size
-    lf_accuracy = lf_correct/size
-    print(f"Test Error: \n Straight Accuracy: {(100*st_accuracy):>0.1f}%, Left Accuracy: {(100*lf_accuracy):>0.1f}%, Average validation loss: {val_loss:>8f} \n")
-    return val_loss
+            st_loss += step_st_loss.item()
+            lf_loss += step_lf_loss.item()
+            total_loss += step_total_loss.item()
+            st_accuracy += (st_class.argmax(1) == y[0].argmax(1)).type(torch.float).sum().item()
+            lf_accuracy += (lf_class.argmax(1) == y[1].argmax(1)).type(torch.float).sum().item()
+    st_loss /= size
+    lf_loss /= size
+    total_loss /= size
+    st_accuracy /= size
+    lf_accuracy /= size
+    total_accuracy = (st_accuracy + lf_accuracy) / (2 * size)
+
+    if VERBOSE:
+        print(f"Test Error: \n Straight Accuracy: {(100*st_accuracy):>0.1f}%, Left Accuracy: {(100*lf_accuracy):>0.1f}%, Average validation loss: {total_loss:>8f} \n")
+
+    writer.add_scalar("Loss/val/st", st_loss.item(), epoch)
+    writer.add_scalar("Loss/val/lf", lf_loss.item(), epoch)
+    writer.add_scalar("Loss/val/total", total_loss.item(), epoch)
+    writer.add_scalar("Acc/val/st", st_loss.item(), epoch)
+    writer.add_scalar("Acc/val/lf", lf_loss.item(), epoch)
+    writer.add_scalar("Acc/val/total", total_accuracy.item(), epoch)
+
+    return st_loss, lf_loss, total_loss, st_accuracy, lf_accuracy, total_accuracy
 
 def run_training():
-    for t in range(EPOCHS):
-        train(train_dataloader, model, loss_fn, optimizer)
-        metric = validate(val_dataloader, model, loss_fn)
+    global_step = [0]
+    for epoch in range(EPOCHS):
+        train(train_dataloader, model, loss_fn, optimizer, global_step, batches_per_log=8)
+        _, _, metric, _, _, _ = validate(val_dataloader, model, loss_fn, epoch)
         scheduler.step
-        checkpointer.save_checkpoint(model, epoch=t, metric=metric)
-
+        checkpointer.save_checkpoint(model, epoch=epoch, metric=metric)
     print(f"🎉 Finished training {EPOCHS} epochs for LightFormer2!")
     torch.save(model.state_dict(), "checkpoints/final.pth")
 
 run_training()
+writer.flush()
