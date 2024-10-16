@@ -1,13 +1,11 @@
 import torch
 from torch import nn
-from checkpointer import ModelCheckpointer
-from models import LightFormer
-from torch.utils.data import DataLoader, random_split
-from dataset import LightFormerDataset
+from torch.utils.data import DataLoader, random_split, WeightedRandomSampler
 from torchinfo import summary
-from torch.utils.data import WeightedRandomSampler
-import os
-from datetime import datetime
+from models import LightFormer
+from checkpointer import ModelCheckpointer
+from lr_scheduler import WarmupCosineScheduler
+from dataset import LightFormerDataset
 from util import run_with_animation
 
 # Constants
@@ -40,8 +38,10 @@ TEST_SPLIT  = 0.1
 VAL_SPLIT   = 0.1
 
 # Training Hyperparameters
-LEARNING_RATE = 5e-6 # empirically determined from learning_rate_finder
-EPOCHS = 15
+# LEARNING_RATE = 5e-6 # empirically determined from learning_rate_finder
+LEARNING_RATE = 1e-2
+EPOCHS = 19 # 4 Warmup + 15 (1 + 2 + 4 + 8) SGDR
+# EPOCHS = 35 # 4 Warmup + 31 (1 + 2 + 4 + 8 + 16) SGDR
 BATCH_SIZE = 16
 
 def count_classes(dataset):
@@ -109,7 +109,7 @@ weighted_sampler = run_with_animation(f=create_weighted_sampler,args=(train_data
 train_dataloader = DataLoader(train_dataset, batch_size=BATCH_SIZE, sampler=weighted_sampler)
 val_dataloader = DataLoader(val_dataset, batch_size=BATCH_SIZE) # val doesn't need resampling
 
-# Setup Device, Model, Loss, Optimizer, Checkpointer
+# Setup Device, Model, Loss, Optimizer, Checkpointer, LR Scheduler
 # To view a summary, run summary(model, input_size=(batch_size, 10, 3, 512, 960)).
 # ** Note: Don't run this before a training job. **
 device = (
@@ -125,6 +125,7 @@ for param in model.backbone.resnet.parameters(): # freeze resnet
 loss_fn = nn.CrossEntropyLoss()
 optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
 checkpointer = ModelCheckpointer('checkpoints', max_saves=5)
+scheduler = WarmupCosineScheduler(optimizer=optimizer, warmup_steps=4, warmup_start_factor=0.001, warmup_end_factor=1, T_0=1, T_mult=2)
 
 # Training, Validation, and Training Loop
 def train(dataloader, model, loss_fn, optimizer, batches_per_log=5):
@@ -205,10 +206,10 @@ def run_training():
     for t in range(EPOCHS):
         train(train_dataloader, model, loss_fn, optimizer)
         metric = validate(val_dataloader, model, loss_fn)
+        scheduler.step
         checkpointer.save_checkpoint(model, epoch=t, metric=metric)
 
     print(f"🎉 Finished training {EPOCHS} epochs for LightFormer2!")
-    # torch.save(model.state_dict(), "checkpoints/model_final.pth")
-    # print("Saved Final PyTorch Model State to model_final.pth")
+    torch.save(model.state_dict(), "checkpoints/final.pth")
 
 run_training()
