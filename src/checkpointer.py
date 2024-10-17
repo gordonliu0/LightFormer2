@@ -1,6 +1,6 @@
 import os
 import torch
-import datetime
+from datetime import datetime
 from typing import Dict, Any
 
 class ModelCheckpointer:
@@ -18,7 +18,7 @@ class ModelCheckpointer:
         model_path = os.path.join(self.save_dir, name)
 
         # Save
-        self.checkpoints.append = (name, metric)
+        self.checkpoints.append((name, metric))
         torch.save(model.state_dict(), model_path)
 
         # Remove old checkpoints if exceeding max_saves
@@ -29,6 +29,7 @@ class ModelCheckpointer:
         self.checkpoints.sort(key=lambda x: x[1], reverse=True)
         for ckpt in self.checkpoints[self.max_saves:]:
             os.remove(os.path.join(self.save_dir, ckpt[0]))
+        self.checkpoints = self.checkpoints[0:self.max_saves]
 
 # Example usage in a training loop:
 # checkpointer = ModelCheckpointer('checkpoints', max_saves=5)
