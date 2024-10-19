@@ -53,7 +53,7 @@ import torch
 import numpy as np
 import matplotlib.pyplot as plt
 from models import LightFormer
-from util import run_with_animation
+from threading import run_with_animation
 
 def hook_fn(module, input, output):
     if isinstance(output, torch.Tensor):

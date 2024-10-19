@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from dataset.dataset import LightFormerDataset
 from models import LightFormer
-from util import run_with_animation
+from threading import run_with_animation
 
 def find_lr(model, train_loader, optimizer, criterion, min_lr=1e-8, max_lr=1e-3, num_iterations=20):
     model.train()

@@ -5,10 +5,10 @@ from torchinfo import summary
 from torch.utils.tensorboard import SummaryWriter
 
 from models import LightFormer
-from checkpointer import ModelCheckpointer
-from lr_scheduler import WarmupCosineScheduler
 from dataset import LightFormerDataset
-from util import run_with_animation
+from utils.checkpointer import ModelCheckpointer
+from utils.lr_scheduler import WarmupCosineScheduler
+from utils.process import run_with_animation
 
 # Constants
 LISA_DAY_DIRECTORIES = [
@@ -43,7 +43,7 @@ VAL_SPLIT   = 0.1
 VERBOSE = True
 
 # Training Hyperparameters
-BATCH_SIZE = 16
+BATCH_SIZE = 32
 
 # Constant Learning Rate, empirically determined from learning_rate_finder
 # LEARNING_RATE = 5e-6
@@ -138,7 +138,7 @@ loss_fn = nn.CrossEntropyLoss()
 val_loss_fn = nn.CrossEntropyLoss(reduction='sum')
 optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
 checkpointer = ModelCheckpointer('checkpoints', max_saves=5)
-scheduler = WarmupCosineScheduler(optimizer=optimizer, warmup_steps=WARMUP_STEPS, warmup_start_factor=0.1, warmup_end_factor=1, T_0=1, T_mult=2, eta_min=0.1)
+scheduler = WarmupCosineScheduler(optimizer=optimizer, warmup_steps=WARMUP_STEPS, warmup_start_factor=0.1, warmup_end_factor=1, T_0=1, T_mult=2, eta_min=1e-7)
 writer = SummaryWriter()
 
 # Training, Validation, and Training Loop
