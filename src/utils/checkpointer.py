@@ -6,8 +6,21 @@ from utils.lr_scheduler import WarmupCosineScheduler
 
 class ModelCheckpointer:
     def __init__(self, save_dir: str):
-        self.save_dir = save_dir
+        self._save_dir = save_dir
         os.makedirs(save_dir, exist_ok=True)
+        self._checkpoint_files = sorted(os.listdir(self.save_dir))
+
+    @property
+    def save_dir(self):
+        return self._save_dir
+
+    @property
+    def checkpoint_files(self):
+        return self._checkpoint_files
+
+    @checkpoint_files.setter
+    def checkpoint_files(self, value):
+        self._checkpoint_files = value
 
     def save_checkpoint(self,
                         epoch: int,
@@ -45,6 +58,9 @@ class ModelCheckpointer:
 
         # Save
         torch.save(checkpoint, model_path)
+
+        # Update checkpoint_files
+        self.checkpoint_files = sorted(os.listdir(self.save_dir))
 
     def remove_checkpoint(self, name) -> None:
         """Remove a checkpoint by name"""

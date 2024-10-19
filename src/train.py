@@ -208,8 +208,8 @@ writer = SummaryWriter(log_dir=f"runs/{RUN_NAME}")
 checkpointer = ModelCheckpointer(save_dir=f"checkpoints/{RUN_NAME}")
 
 # The rest depend on whether or not a checkpoint exists.
-checkpoints = sorted(os.listdir(f"checkpoints/{RUN_NAME}"))
-if len(checkpoints) == 0: # no checkpoints yet, instantiate new versions
+checkpoints = checkpointer.checkpoint_files
+if len(checkpoints) == 0: # no checkpoints yet, instantiate new values
     epoch = 0
     global_step = [0]
     model = LightFormer().to(device) # summary(model, input_size=(batch_size, 10, 3, 512, 960))
@@ -223,7 +223,7 @@ if len(checkpoints) == 0: # no checkpoints yet, instantiate new versions
                                     T_0=1,
                                     T_mult=2,
                                     eta_min=1e-7)
-else: # there are checkpoints
+else: # checkpoints exist, we are in the middle of training and grab states for next training epoch.
     checkpoint = torch.load(checkpoints[-1]) # load the latest checkpoint
     epoch = checkpoint['epoch']
     global_step = [checkpoint['global_step']]
