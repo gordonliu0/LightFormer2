@@ -1,14 +1,15 @@
+import os
 import torch
 from torch import nn
-from torch.utils.data import DataLoader, random_split, WeightedRandomSampler
-from torchinfo import summary
+from torch.utils.data import DataLoader, random_split
 from torch.utils.tensorboard import SummaryWriter
-
 from models import LightFormer
-from dataset import LightFormerDataset
+from dataset import LightFormerDataset, create_weighted_sampler
 from utils.checkpointer import ModelCheckpointer
 from utils.lr_scheduler import WarmupCosineScheduler
-from utils.process import run_with_animation
+
+# Run Name
+RUN_NAME = "exp1"
 
 # Constants
 LISA_DAY_DIRECTORIES = [
@@ -39,10 +40,7 @@ TRAIN_SPLIT = 0.8
 TEST_SPLIT  = 0.1
 VAL_SPLIT   = 0.1
 
-# Training Parameters
-VERBOSE = True
-
-# Training Hyperparameters
+# Hyperparameters
 BATCH_SIZE = 32
 
 # Constant Learning Rate, empirically determined from learning_rate_finder
@@ -54,115 +52,21 @@ LEARNING_RATE = 1e-6
 WARMUP_STEPS = 2
 EPOCHS = 33 # 2 Warmup + 31 SGDR (broken into (1 + 2 + 4 + 8 + 16) steps)
 
-# Dataset Functions
-
-def count_classes(dataset):
-    'Count each type of class in the dataset.'
-    # Example Usage:
-    # print("Start Counting Class Frequencies")
-    # print(count_classes(train_dataset))
-    # print(count_classes(val_dataset))
-    # print(count_classes(test_dataset))
-    class0 = 0
-    class1 = 0
-    class2 = 0
-    class3 = 0
-    for data in dataset:
-        y = data['label']
-        if y[0] == 1:
-            class0 += 1
-        if y[1] == 1:
-            class1 += 1
-        if y[2] == 1:
-            class2 += 1
-        if y[3] == 1:
-            class3 += 1
-    return class0, class1, class2, class3
-
-def count_labels(dataset):
-    'Count each type of label in the dataset.'
-    type0 = (1., 0., 1., 0.)
-    type1 = (1., 0., 0., 1.)
-    type2 = (0., 1., 1., 0.)
-    type3 = (0., 1., 0., 1.)
-    count0 = 0
-    count1 = 0
-    count2 = 0
-    count3 = 0
-    for data in dataset:
-        y = data['label']
-        if y[0] == 1:
-            if y[2] == 1:
-                count0 += 1
-            else:
-                count1 += 1
-        else:
-            if y[2] == 1:
-                count2 += 1
-            else:
-                count3 += 1
-    return {type0: count0, type1: count1, type2: count2, type3: count3}
-
-def create_weighted_sampler(dataset):
-    'Weighted samplers help with unbalanced datasets.'
-    # label_counts = count_labels(dataset)
-    label_counts = {(1., 0., 1., 0.): 211, (1., 0., 0., 1.): 272, (0., 1., 1., 0.): 43, (0., 1., 0., 1.): 703}
-    class_weights = {class_label: 1.0 / count for class_label, count in label_counts.items()}
-    sample_weights = [class_weights[tuple(sample["label"].tolist())] for sample in dataset]
-    return WeightedRandomSampler(sample_weights, len(sample_weights))
-
-# Dataset, Dataloader
-full_dataset = LightFormerDataset(directory=LISA_DAY_DIRECTORIES)
-generator = torch.Generator().manual_seed(42)
-train_dataset, test_dataset, val_dataset = random_split(full_dataset,
-                                                        [TRAIN_SPLIT, TEST_SPLIT, VAL_SPLIT],
-                                                        generator=generator)
-weighted_sampler = run_with_animation(f=create_weighted_sampler,args=(train_dataset,), name='Weighted Sampler')
-train_dataloader = DataLoader(train_dataset, batch_size=BATCH_SIZE, sampler=weighted_sampler)
-val_dataloader = DataLoader(val_dataset, batch_size=BATCH_SIZE) # val doesn't need resampling
-
-# Setup Device, Model, Loss, Optimizer, Checkpointer, LR Scheduler, Tensorboard Writer
-# To view a summary, run summary(model, input_size=(batch_size, 10, 3, 512, 960)).
-# ** Note: Don't run this before a training job. **
-device = (
-    "cuda"
-    if torch.cuda.is_available()
-    else "mps"
-    if torch.backends.mps.is_available()
-    else "cpu"
-)
-model = LightFormer().to(device)
-for param in model.backbone.resnet.parameters(): # freeze resnet
-    param.requires_grad = False
-loss_fn = nn.CrossEntropyLoss()
-val_loss_fn = nn.CrossEntropyLoss(reduction='sum')
-optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
-checkpointer = ModelCheckpointer('checkpoints', max_saves=5)
-scheduler = WarmupCosineScheduler(optimizer=optimizer, warmup_steps=WARMUP_STEPS, warmup_start_factor=0.1, warmup_end_factor=1, T_0=1, T_mult=2, eta_min=1e-7)
-writer = SummaryWriter()
-
-# Training, Validation, and Training Loop
-def train(dataloader, model, loss_fn, optimizer, global_step, batches_per_log=5):
+# Training Step, Validation Step, and Training Loop
+def train(dataloader, model, loss_fn, optimizer, writer, global_step):
     '''
-    Run a training epoch.
+    Run a single training epoch.
 
     Args:
         dataloader: Dataloader instance used in training steps.
         model: Pytorch model to use in training backpropagation.
         loss_fn: Loss function to optimize for.
         optimizer: Pytorch optimizer controlling training backpropagation.
+        writer: Tensorboard writer to use for scalar value logging.
         global_step: Mutable list that holds global step count.
-        batches_per_log: How many batches for every log. Only prints if VERBOSE = True.
     '''
-    # Last Loss holds average loss for the last batches_per_log
-    st = { 'running_loss': 0., 'last_loss': 0.}
-    lf = { 'running_loss': 0., 'last_loss': 0.}
-    total = { 'running_loss': 0., 'last_loss': 0.}
-
-    size = len(dataloader.dataset)
     model.train()
-    for batch_index, batch in enumerate(dataloader):
-
+    for batch in dataloader:
         # Load sample and label
         X = batch['images'].to(device)
         y = batch['label'].to(device).view(len(X), 2, 2).permute(1, 0, 2)
@@ -180,28 +84,13 @@ def train(dataloader, model, loss_fn, optimizer, global_step, batches_per_log=5)
         optimizer.step()
         optimizer.zero_grad()
 
-        # Gather Data and Report
-        st['running_loss'] += st_loss.item()
-        lf['running_loss'] += lf_loss.item()
-        total['running_loss'] += total_loss.item()
-
-        writer.add_scalar("Loss/train/st", st_loss.item(), global_step[0])
-        writer.add_scalar("Loss/train/lf", lf_loss.item(), global_step[0])
-        writer.add_scalar("Loss/train/total", total_loss.item(), global_step[0])
+        # Report to tensorboard
+        writer.add_scalar("TrainLoss/st", st_loss.item(), global_step[0])
+        writer.add_scalar("TrainLoss/lf", lf_loss.item(), global_step[0])
+        writer.add_scalar("TrainLoss/total", total_loss.item(), global_step[0])
         global_step[0] += 1
 
-        if VERBOSE and ((batch_index+1) % batches_per_log == 0):
-            current_sample_index = (batch_index + 1) * len(X)
-            st['last_loss'] = st['running_loss'] / batches_per_log
-            lf['last_loss'] = lf['running_loss'] / batches_per_log
-            total['last_loss'] = total['running_loss'] / batches_per_log
-            print()
-            print(f"st_loss: {st['last_loss']:>7f} lf_loss: {lf['last_loss']:>7f} total_loss: {total['last_loss']:>7f}  Sample [{current_sample_index:>5d}/{size:>5d}], Batch {batch_index}")
-            st['running_loss'] = 0
-            lf['running_loss'] = 0
-            total['running_loss'] = 0
-
-def validate(dataloader, model, loss_fn, epoch):
+def validate(dataloader, model, loss_fn):
     '''
     Run a validation step.
 
@@ -211,8 +100,7 @@ def validate(dataloader, model, loss_fn, epoch):
         loss_fn: Loss function to calculate loss.
         epoch: Current epoch.
     '''
-    size = len(dataloader.dataset)
-    num_batches = len(dataloader)
+    # Set to eval mode (no backprop)
     model.eval()
     st_loss, lf_loss, st_accuracy, lf_accuracy = 0, 0, 0, 0
     with torch.no_grad():
@@ -233,6 +121,9 @@ def validate(dataloader, model, loss_fn, epoch):
             lf_loss += step_lf_loss
             st_accuracy += (st_class.argmax(1) == y[0].argmax(1)).type(torch.float).sum().item()
             lf_accuracy += (lf_class.argmax(1) == y[1].argmax(1)).type(torch.float).sum().item()
+
+    # Compute Val Metrics
+    size = len(dataloader.dataset)
     st_loss /= size
     lf_loss /= size
     total_loss = st_loss + lf_loss
@@ -240,30 +131,118 @@ def validate(dataloader, model, loss_fn, epoch):
     lf_accuracy /= size
     total_accuracy = (st_accuracy + lf_accuracy) / 2
 
-    if VERBOSE:
-        print(f"Test Error: \n Straight Accuracy: {(100*st_accuracy):>0.1f}%, Left Accuracy: {(100*lf_accuracy):>0.1f}%, Average validation loss: {total_loss:>8f} \n")
-
-    writer.add_scalar("Loss/val/st", st_loss, epoch)
-    writer.add_scalar("Loss/val/lf", lf_loss, epoch)
-    writer.add_scalar("Loss/val/total", total_loss, epoch)
-    writer.add_scalar("Acc/val/st", st_accuracy, epoch)
-    writer.add_scalar("Acc/val/lf", lf_accuracy, epoch)
-    writer.add_scalar("Acc/val/total", total_accuracy, epoch)
-
+    # Return
     return st_loss, lf_loss, total_loss, st_accuracy, lf_accuracy, total_accuracy
 
-def run_training():
-    global_step = [0]
-    for epoch in range(EPOCHS):
-        current_lr = scheduler.get_last_lr()[0]
-        print(f"Epoch {epoch}, lr={current_lr}")
-        writer.add_scalar("LR", current_lr, epoch)
-        train(train_dataloader, model, loss_fn, optimizer, global_step, batches_per_log=8)
-        _, _, metric, _, _, _ = validate(val_dataloader, model, val_loss_fn, epoch)
-        scheduler.step()
-        checkpointer.save_checkpoint(model, epoch=epoch, metric=metric)
-    print(f"🎉 Finished training {EPOCHS} epochs for LightFormer2!")
-    torch.save(model.state_dict(), "checkpoints/final.pth")
+def run_training(epoch, epochs, train_dataloader, model, train_loss_fn, optimizer, writer, global_step, val_dataloader, val_loss_fn, scheduler, checkpointer: ModelCheckpointer):
+    """
+    Run training over a number of epochs.
 
-run_training()
-writer.flush()
+    Args:
+        epoch: Epoch to start training from.
+        epochs: Epoch to end training before.
+        train_dataloader: Dataloader to use in training steps.
+        model: Model to perform training on.
+        train_loss_fn: Loss function used in training steps.
+        optimizer: Optimizer for backprop in training.
+        writer: Tensorboard writer instance.
+        global_step: Global step of training across epochs.
+        val_dataloader: Dataloader for validation steps.
+        val_loss_fn: Loss function for validation steps. For sums across batches rather than averages.
+        scheduler: Learning rate scheduler to update optimizer instance.
+        checkpointer: Controls saving checkpoints every epoch.
+    """
+    for e in range(epoch, epochs):
+        # Train
+        train(dataloader=train_dataloader,
+              model=model,
+              loss_fn=train_loss_fn,
+              optimizer=optimizer,
+              writer=writer,
+              global_step=global_step)
+
+        # Validate
+        st_loss, lf_loss, total_loss, st_accuracy, lf_accuracy, total_accuracy = validate(val_dataloader, model, val_loss_fn)
+
+        # Tensorboard Logging
+        writer.add_scalar("LR", scheduler.get_last_lr()[0], e)
+        writer.add_scalar("LossVal/st", st_loss, e)
+        writer.add_scalar("LossVal/lf", lf_loss, e)
+        writer.add_scalar("LossVal/total", total_loss, e)
+        writer.add_scalar("AccVal/st", st_accuracy, e)
+        writer.add_scalar("AccVal/lf", lf_accuracy, e)
+        writer.add_scalar("AccVal/total", total_accuracy, e)
+
+        # Update Learning Rate
+        scheduler.step()
+
+        # Save Checkpoint after each epoch
+        checkpointer.save_checkpoint(
+            epoch = e + 1,
+            global_step = global_step[0],
+            model=model,
+            optimizer=optimizer,
+            scheduler=scheduler,
+            loss=total_loss)
+
+        # Flush writer after each epoch
+        writer.flush()
+
+# Constants no matter progress on run.
+full_dataset = LightFormerDataset(directory=LISA_DAY_DIRECTORIES)
+train_dataset, test_dataset, val_dataset = random_split(full_dataset,
+                                                        [TRAIN_SPLIT, TEST_SPLIT, VAL_SPLIT],
+                                                        generator=torch.Generator().manual_seed(42))
+train_dataloader = DataLoader(train_dataset, batch_size=BATCH_SIZE, sampler=create_weighted_sampler(train_dataset))
+val_dataloader = DataLoader(val_dataset, batch_size=BATCH_SIZE) # val doesn't need resampling
+device = (
+    "cuda"
+    if torch.cuda.is_available()
+    else "mps"
+    if torch.backends.mps.is_available()
+    else "cpu"
+)
+train_loss_fn = nn.CrossEntropyLoss()
+val_loss_fn = nn.CrossEntropyLoss(reduction='sum')
+writer = SummaryWriter(log_dir=f"runs/{RUN_NAME}")
+checkpointer = ModelCheckpointer(save_dir=f"checkpoints/{RUN_NAME}")
+
+# The rest depend on whether or not a checkpoint exists.
+checkpoints = sorted(os.listdir(f"checkpoints/{RUN_NAME}"))
+if len(checkpoints) == 0: # no checkpoints yet, instantiate new versions
+    epoch = 0
+    global_step = [0]
+    model = LightFormer().to(device) # summary(model, input_size=(batch_size, 10, 3, 512, 960))
+    for param in model.backbone.resnet.parameters(): # freeze resnet
+        param.requires_grad = False
+    optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
+    scheduler = WarmupCosineScheduler(optimizer=optimizer,
+                                    warmup_steps=WARMUP_STEPS,
+                                    warmup_start_factor=0.1,
+                                    warmup_end_factor=1,
+                                    T_0=1,
+                                    T_mult=2,
+                                    eta_min=1e-7)
+else: # there are checkpoints
+    checkpoint = torch.load(checkpoints[-1]) # load the latest checkpoint
+    epoch = checkpoint['epoch']
+    global_step = [checkpoint['global_step']]
+    model = checkpoint['model']
+    optimizer = checkpoint['optimizer']
+    scheduler = checkpoint['scheduler']
+
+# RUN TRAINING!
+run_training(
+    epoch=epoch,
+    epochs=EPOCHS,
+    train_dataloader=train_dataloader,
+    model=model,
+    train_loss_fn=train_loss_fn,
+    optimizer=optimizer,
+    writer=writer,
+    global_step=global_step,
+    val_dataloader=val_dataloader,
+    val_loss_fn=val_loss_fn,
+    scheduler=scheduler,
+    checkpointer=checkpointer
+)

@@ -2,34 +2,54 @@ import os
 import torch
 from datetime import datetime
 from typing import Dict, Any
+from utils.lr_scheduler import WarmupCosineScheduler
 
 class ModelCheckpointer:
-    def __init__(self, save_dir: str, max_saves: int = 3):
+    def __init__(self, save_dir: str):
         self.save_dir = save_dir
-        self.max_saves = max_saves
-        self.checkpoints = []
         os.makedirs(save_dir, exist_ok=True)
 
-    def save_checkpoint(self, model: torch.nn.Module, epoch: int, metric: float) -> None:
-        """Save a checkpoint of the model."""
+    def save_checkpoint(self,
+                        epoch: int,
+                        global_step: int,
+                        model: torch.nn.Module,
+                        optimizer: torch.optim.optimizer.Optimizer,
+                        scheduler: WarmupCosineScheduler,
+                        loss: float) -> None:
+        """
+        Save a checkpoint of the model. Checkpoints should save states ready for the next training epoch.
+
+        Args:
+            epoch: Next epoch of training.
+            global_step: Next global step of training.
+            model: Current model state.
+            optimizer: Current optimizer state.
+            scheduler: Current scheduler state.
+            loss: Validation loss from last validation step.
+        """
         # Strings
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        name = f"t_{timestamp}_e_{epoch}"
+        name = f"epoch{epoch}time{timestamp}"
         model_path = os.path.join(self.save_dir, name)
 
+        # Checkpoint Object
+        checkpoint = {
+            'epoch': epoch,
+            'global_step': global_step,
+            'model': model,
+            'optimizer': optimizer,
+            'scheduler': scheduler,
+            'timestamp': timestamp,
+            'loss': loss,
+        }
+
         # Save
-        self.checkpoints.append((name, metric))
-        torch.save(model.state_dict(), model_path)
+        torch.save(checkpoint, model_path)
 
-        # Remove old checkpoints if exceeding max_saves
-        self._cleanup_old_checkpoints()
+    def remove_checkpoint(self, name) -> None:
+        """Remove a checkpoint by name"""
+        os.remove(os.path.join(self.save_dir, name))
 
-    def _cleanup_old_checkpoints(self) -> None:
-        """Remove old checkpoints, keeping only the latest max_saves."""
-        self.checkpoints.sort(key=lambda x: x[1], reverse=True)
-        for ckpt in self.checkpoints[self.max_saves:]:
-            os.remove(os.path.join(self.save_dir, ckpt[0]))
-        self.checkpoints = self.checkpoints[0:self.max_saves]
 
 # Example usage in a training loop:
 # checkpointer = ModelCheckpointer('checkpoints', max_saves=5)
