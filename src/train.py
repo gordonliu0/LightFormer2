@@ -13,29 +13,29 @@ RUN_NAME = "exp1"
 
 # Constants
 LISA_DAY_DIRECTORIES = [
-    '/Users/gordonliu/Documents/ml_projects/LightForker-2/data/Kaggle_Dataset/daySequence1',
-    '/Users/gordonliu/Documents/ml_projects/LightForker-2/data/Kaggle_Dataset/daySequence2',
-    '/Users/gordonliu/Documents/ml_projects/LightForker-2/data/Kaggle_Dataset/dayTrain/dayClip1',
-    '/Users/gordonliu/Documents/ml_projects/LightForker-2/data/Kaggle_Dataset/dayTrain/dayClip2',
-    '/Users/gordonliu/Documents/ml_projects/LightForker-2/data/Kaggle_Dataset/dayTrain/dayClip3',
-    '/Users/gordonliu/Documents/ml_projects/LightForker-2/data/Kaggle_Dataset/dayTrain/dayClip4',
-    '/Users/gordonliu/Documents/ml_projects/LightForker-2/data/Kaggle_Dataset/dayTrain/dayClip5',
-    '/Users/gordonliu/Documents/ml_projects/LightForker-2/data/Kaggle_Dataset/dayTrain/dayClip6',
-    '/Users/gordonliu/Documents/ml_projects/LightForker-2/data/Kaggle_Dataset/dayTrain/dayClip7',
-    '/Users/gordonliu/Documents/ml_projects/LightForker-2/data/Kaggle_Dataset/dayTrain/dayClip8',
-    '/Users/gordonliu/Documents/ml_projects/LightForker-2/data/Kaggle_Dataset/dayTrain/dayClip9',
-    '/Users/gordonliu/Documents/ml_projects/LightForker-2/data/Kaggle_Dataset/dayTrain/dayClip10',
-    '/Users/gordonliu/Documents/ml_projects/LightForker-2/data/Kaggle_Dataset/dayTrain/dayClip11',
-    '/Users/gordonliu/Documents/ml_projects/LightForker-2/data/Kaggle_Dataset/dayTrain/dayClip12',
-    '/Users/gordonliu/Documents/ml_projects/LightForker-2/data/Kaggle_Dataset/dayTrain/dayClip13',]
+    '/Users/gordonliu/Documents/ml_projects/LightFormer2/data/Kaggle_Dataset/daySequence1',
+    '/Users/gordonliu/Documents/ml_projects/LightFormer2/data/Kaggle_Dataset/daySequence2',
+    '/Users/gordonliu/Documents/ml_projects/LightFormer2/data/Kaggle_Dataset/dayTrain/dayClip1',
+    '/Users/gordonliu/Documents/ml_projects/LightFormer2/data/Kaggle_Dataset/dayTrain/dayClip2',
+    '/Users/gordonliu/Documents/ml_projects/LightFormer2/data/Kaggle_Dataset/dayTrain/dayClip3',
+    '/Users/gordonliu/Documents/ml_projects/LightFormer2/data/Kaggle_Dataset/dayTrain/dayClip4',
+    '/Users/gordonliu/Documents/ml_projects/LightFormer2/data/Kaggle_Dataset/dayTrain/dayClip5',
+    '/Users/gordonliu/Documents/ml_projects/LightFormer2/data/Kaggle_Dataset/dayTrain/dayClip6',
+    '/Users/gordonliu/Documents/ml_projects/LightFormer2/data/Kaggle_Dataset/dayTrain/dayClip7',
+    '/Users/gordonliu/Documents/ml_projects/LightFormer2/data/Kaggle_Dataset/dayTrain/dayClip8',
+    '/Users/gordonliu/Documents/ml_projects/LightFormer2/data/Kaggle_Dataset/dayTrain/dayClip9',
+    '/Users/gordonliu/Documents/ml_projects/LightFormer2/data/Kaggle_Dataset/dayTrain/dayClip10',
+    '/Users/gordonliu/Documents/ml_projects/LightFormer2/data/Kaggle_Dataset/dayTrain/dayClip11',
+    '/Users/gordonliu/Documents/ml_projects/LightFormer2/data/Kaggle_Dataset/dayTrain/dayClip12',
+    '/Users/gordonliu/Documents/ml_projects/LightFormer2/data/Kaggle_Dataset/dayTrain/dayClip13',]
 LISA_NIGHT_DIRECTORIES = [
-    '/Users/gordonliu/Documents/ml_projects/LightForker-2/data/Kaggle_Dataset/nightSequence1',
-    '/Users/gordonliu/Documents/ml_projects/LightForker-2/data/Kaggle_Dataset/nightSequence2',
-    '/Users/gordonliu/Documents/ml_projects/LightForker-2/data/Kaggle_Dataset/nightTrain/nightClip1',
-    '/Users/gordonliu/Documents/ml_projects/LightForker-2/data/Kaggle_Dataset/nightTrain/nightClip2',
-    '/Users/gordonliu/Documents/ml_projects/LightForker-2/data/Kaggle_Dataset/nightTrain/nightClip3',
-    '/Users/gordonliu/Documents/ml_projects/LightForker-2/data/Kaggle_Dataset/nightTrain/nightClip4',
-    '/Users/gordonliu/Documents/ml_projects/LightForker-2/data/Kaggle_Dataset/nightTrain/nightClip5']
+    '/Users/gordonliu/Documents/ml_projects/LightFormer2/data/Kaggle_Dataset/nightSequence1',
+    '/Users/gordonliu/Documents/ml_projects/LightFormer2/data/Kaggle_Dataset/nightSequence2',
+    '/Users/gordonliu/Documents/ml_projects/LightFormer2/data/Kaggle_Dataset/nightTrain/nightClip1',
+    '/Users/gordonliu/Documents/ml_projects/LightFormer2/data/Kaggle_Dataset/nightTrain/nightClip2',
+    '/Users/gordonliu/Documents/ml_projects/LightFormer2/data/Kaggle_Dataset/nightTrain/nightClip3',
+    '/Users/gordonliu/Documents/ml_projects/LightFormer2/data/Kaggle_Dataset/nightTrain/nightClip4',
+    '/Users/gordonliu/Documents/ml_projects/LightFormer2/data/Kaggle_Dataset/nightTrain/nightClip5']
 TRAIN_SPLIT = 0.8
 TEST_SPLIT  = 0.1
 VAL_SPLIT   = 0.1
