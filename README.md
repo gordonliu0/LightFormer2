@@ -13,22 +13,19 @@ The goal of this repository is to understand and rewrite the LightFormer model p
 
 # Datasets
 
-LightFormer uses two datasets:
+LightFormer2 is implemented for
+
+- LISA Traffic Light Dataset: https://www.kaggle.com/datasets/mbornoe/lisa-traffic-light-dataset
+
+If desired, can also use:
 
 - Bosch Small Traffic Lights Dataset: https://hci.iwr.uni-heidelberg.de/content/bosch-small-traffic-lights-dataset
-- LISA Traffic Light Dataset: https://www.kaggle.com/datasets/mbornoe/lisa-traffic-light-dataset
 
 ## Basic Dataset Setup
 
-1. Install datasets from links above.
-2. Unzip.
-3. Copy `frames` folder into their respective places.
-
-## Custom Dataset Setup
-
-1. (Optional) If you'd like to set up a custom structure, you can update sample_database_folder in `configs/generate_config.py`. Keep in mind each directory listed must have a `.json` for labels and a `frames` for images.
-2. Run `python3 configs/generate_config.py` to generate configs.
-3. Note that if you are keeping this on github make sure to .gitignore the image directories!
+1. Install and unzip datasets from links above.
+2. Copy `frames` folder directly into their respective places.
+3. Specify paths to each directory containing a frames folder and a samples.json label file in the `train.py` and `test.py` code.
 
 # Training
 
