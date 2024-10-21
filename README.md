@@ -38,3 +38,5 @@ PYTORCH_ENABLE_MPS_FALLBACK=1 python3 src/train.py
 In LightFormer2 directory:
 
 PYTORCH_ENABLE_MPS_FALLBACK=1 python3 src/test.py
+
+# Tensorboard

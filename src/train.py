@@ -92,9 +92,9 @@ def train(dataloader, model, loss_fn, optimizer, writer, global_step):
         optimizer.zero_grad()
 
         # Report to tensorboard
-        writer.add_scalar("TrainLoss/st", st_loss.item(), global_step[0])
-        writer.add_scalar("TrainLoss/lf", lf_loss.item(), global_step[0])
-        writer.add_scalar("TrainLoss/total", total_loss.item(), global_step[0])
+        writer.add_scalar("Loss/train/st", st_loss.item(), global_step[0])
+        writer.add_scalar("Loss/train/lf", lf_loss.item(), global_step[0])
+        writer.add_scalar("Loss/train/total", total_loss.item(), global_step[0])
         global_step[0] += 1
 
 def validate(dataloader, model, loss_fn):
@@ -173,12 +173,12 @@ def run_training(epoch, epochs, train_dataloader, model, train_loss_fn, optimize
 
         # Tensorboard Logging
         writer.add_scalar("LR", scheduler.get_last_lr()[0], e)
-        writer.add_scalar("LossVal/st", st_loss, e)
-        writer.add_scalar("LossVal/lf", lf_loss, e)
-        writer.add_scalar("LossVal/total", total_loss, e)
-        writer.add_scalar("AccVal/st", st_accuracy, e)
-        writer.add_scalar("AccVal/lf", lf_accuracy, e)
-        writer.add_scalar("AccVal/total", total_accuracy, e)
+        writer.add_scalar("Loss/val/st", st_loss, e)
+        writer.add_scalar("Loss/val/lf", lf_loss, e)
+        writer.add_scalar("Loss/val/total", total_loss, e)
+        writer.add_scalar("Acc/val/st", st_accuracy, e)
+        writer.add_scalar("Acc/val/lf", lf_accuracy, e)
+        writer.add_scalar("Acc/val/total", total_accuracy, e)
 
         # Update Learning Rate
         scheduler.step()
