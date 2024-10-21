@@ -198,8 +198,7 @@ def run_training(epoch, epochs, train_dataloader, model, train_loss_fn, optimize
 
 full_dataset = LightFormerDataset(directory=LISA_DIRECTORY,
                                   preprocessed_directory=LISA_PREPROCESSED_DIRECTORY,
-                                  subdirectories=LISA_NIGHT_SUBDIRECTORIES,
-                                  preprocessed=False)
+                                  subdirectories=LISA_NIGHT_SUBDIRECTORIES)
 generator=torch.Generator().manual_seed(42)
 train_dataset, test_dataset, val_dataset = random_split(full_dataset,
                                                         [TRAIN_SPLIT, TEST_SPLIT, VAL_SPLIT],
