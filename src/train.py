@@ -15,21 +15,22 @@ DEBUG_VERBOSE = True
 LISA_DIRECTORY = '/Users/gordonliu/Documents/ml_projects/LightFormer2/data/Kaggle_Dataset'
 LISA_PREPROCESSED_DIRECTORY = '/Users/gordonliu/Documents/ml_projects/LightFormer2/data/LISA_Preprocessed'
 LISA_DAY_SUBDIRECTORIES = [
-    'daySequence1',
-    'daySequence2',
-    'dayTrain/dayClip1',
-    'dayTrain/dayClip2',
-    'dayTrain/dayClip3',
-    'dayTrain/dayClip4',
-    'dayTrain/dayClip5',
-    'dayTrain/dayClip6',
-    'dayTrain/dayClip7',
-    'dayTrain/dayClip8',
-    'dayTrain/dayClip9',
-    'dayTrain/dayClip10',
-    'dayTrain/dayClip11',
-    'dayTrain/dayClip12',
+    # 'daySequence1',
+    # 'daySequence2',
+    # 'dayTrain/dayClip1',
+    # 'dayTrain/dayClip2',
+    # 'dayTrain/dayClip3',
+    # 'dayTrain/dayClip4',
+    # 'dayTrain/dayClip5',
+    # 'dayTrain/dayClip6',
+    # 'dayTrain/dayClip7',
+    # 'dayTrain/dayClip8',
+    # 'dayTrain/dayClip9',
+    # 'dayTrain/dayClip10',
+    # 'dayTrain/dayClip11',
+    # 'dayTrain/dayClip12',
     'dayTrain/dayClip13',]
+
 LISA_NIGHT_SUBDIRECTORIES = [
     'nightSequence1',
     'nightSequence2',
@@ -198,17 +199,18 @@ def run_training(epoch, epochs, train_dataloader, model, train_loss_fn, optimize
 
 full_dataset = LightFormerDataset(directory=LISA_DIRECTORY,
                                   preprocessed_directory=LISA_PREPROCESSED_DIRECTORY,
-                                  subdirectories=LISA_NIGHT_SUBDIRECTORIES)
+                                  subdirectories=LISA_DAY_SUBDIRECTORIES)
 generator=torch.Generator().manual_seed(42)
 train_dataset, test_dataset, val_dataset = random_split(full_dataset,
                                                         [TRAIN_SPLIT, TEST_SPLIT, VAL_SPLIT],
                                                         generator=generator)
 if DEBUG_VERBOSE: print("Created all datasets")
 
-weighted_sampler=create_weighted_sampler(train_dataset)
-if DEBUG_VERBOSE: print("Created weighted sampler")
+# weighted_sampler=create_weighted_sampler(train_dataset)
+# if DEBUG_VERBOSE: print("Created weighted sampler")
+# train_dataloader = DataLoader(train_dataset, batch_size=BATCH_SIZE, sampler=weighted_sampler)
 
-train_dataloader = DataLoader(train_dataset, batch_size=BATCH_SIZE, sampler=weighted_sampler)
+train_dataloader = DataLoader(train_dataset, batch_size=BATCH_SIZE) #temp unweighted sampling train dataloader
 val_dataloader = DataLoader(val_dataset, batch_size=BATCH_SIZE) # val doesn't need resampling
 if DEBUG_VERBOSE: print("Created all dataloaders")
 
@@ -228,8 +230,7 @@ checkpointer = ModelCheckpointer(save_dir=f"checkpoints/{RUN_NAME}")
 if DEBUG_VERBOSE: print("Created Loss Functions, Tensorboard writer, and Checkpointer")
 
 # The rest depend on whether or not a checkpoint exists.
-checkpoints = checkpointer.checkpoint_files
-if len(checkpoints) == 0: # no checkpoints yet, instantiate new values
+if len(checkpointer) == 0: # no checkpoints yet, instantiate new values
     if DEBUG_VERBOSE: print("No checkpoints: Instantiating new values.")
     epoch = 0
     global_step = [0]
@@ -245,8 +246,8 @@ if len(checkpoints) == 0: # no checkpoints yet, instantiate new values
                                     T_mult=2,
                                     eta_min=1e-7)
 else: # checkpoints exist, we are in the middle of training and grab states for next training epoch.
-    if DEBUG_VERBOSE: print(f"Checkpoints exist: Loading {checkpoints[-1]} and continuing from last epoch")
-    checkpoint = torch.load(checkpoints[-1]) # load the latest checkpoint
+    if DEBUG_VERBOSE: print(f"Checkpoints exist: Loading {checkpointer.checkpoint_files[-1]} and continuing from last epoch")
+    checkpoint = checkpointer.load_checkpoint(-1) # load the latest checkpoint
     epoch = checkpoint['epoch']
     global_step = [checkpoint['global_step']]
     model = checkpoint['model']

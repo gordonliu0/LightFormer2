@@ -5,7 +5,7 @@ The goal of this repository is to understand and rewrite the LightFormer model p
 # Install Requirements
 
 1. Clone this repository.
-2. Make sure you have Python3.8 installed, checking using `python3.8 --version`
+2. Make sure you have Python3 installed, checking using `python3 --version`
 3. Set up a virtual environment using `python3.8 -m venv .venv` and `source .venv/bin/activate`
 4. Update pip using `pip install --upgrade pip`
 5. Install dependencies: `pip install -r requirements.txt`
@@ -29,12 +29,12 @@ If desired, can also use:
 
 # Training
 
-In src directory:
+In LightFormer2 directory:
 
-PYTORCH_ENABLE_MPS_FALLBACK=1 python3 train.py
+PYTORCH_ENABLE_MPS_FALLBACK=1 python3 src/train.py
 
 # Testing
 
-In src directory:
+In LightFormer2 directory:
 
-PYTORCH_ENABLE_MPS_FALLBACK=1 python3 train.py
+PYTORCH_ENABLE_MPS_FALLBACK=1 python3 src/test.py

@@ -143,10 +143,10 @@ class LightFormerDataset(Dataset):
             image_name: name of file containing image or image tensor, with no file extension
         """
         if self.preprocessed:
-            tensor_path=os.path.join(self.preprocessed_directory, subdirectory, image_name)+".pt"
+            tensor_path=os.path.join(self.preprocessed_directory, subdirectory, "frames", image_name)+".pt"
             tensor = torch.load(tensor_path)
             return tensor
-        image_path=os.path.join(self.directory, subdirectory, image_name)+".jpg"
+        image_path=os.path.join(self.directory, subdirectory, "frames", image_name)+".jpg"
         tensor = self._read_transform_image(image_path)
         return tensor
 

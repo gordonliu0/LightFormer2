@@ -22,6 +22,9 @@ class ModelCheckpointer:
     def checkpoint_files(self, value):
         self._checkpoint_files = value
 
+    def __len__(self):
+        return len(self.checkpoint_files)
+
     def save_checkpoint(self,
                         epoch: int,
                         global_step: int,
@@ -66,6 +69,12 @@ class ModelCheckpointer:
         """Remove a checkpoint by name"""
         os.remove(os.path.join(self.save_dir, name))
 
+    def load_checkpoint(self, index: int):
+        """Load a checkpoint in checkpoint_files by index."""
+        name = self.checkpoint_files[index]
+        checkpoint_path = os.path.join(self.save_dir, name)
+        checkpoint = torch.load(checkpoint_path)
+        return checkpoint
 
 # Example usage in a training loop:
 # checkpointer = ModelCheckpointer('checkpoints', max_saves=5)
