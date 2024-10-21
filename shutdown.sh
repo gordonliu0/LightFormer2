@@ -1,9 +1,11 @@
 #!/bin/bash
 
-MY_PROGRAM="Python" # For example, "apache2" or "nginx"
+MY_PROGRAM="Python"
 MY_USER="gordonliu"
-CHECKPOINT="/Users/gordonliu/Documents/ml_projects/LightForker-2/src/checkpoints/t_20241017_200614_e_6"
+SOURCE_DIRECTORY="/Users/gordonliu/Documents/ml_projects/LightFormer2"
 BUCKET_NAME="lf_checkpoints" # For example, "my-checkpoint-files" (without gs://)
+EXCLUDE_REGEX=".*\.DS_Store$|\.venv\/.*$|\.vscode\/.*$|.*\/__pycache__\/.*$|\.gitignore$|\.git\/.*$"
+# ignore all ds_store, all .venv, all .vscode, all pycaches, all .gitignore, and all .git.
 
 echo "Shutting down!  Seeing if ${MY_PROGRAM} is running."
 
@@ -23,8 +25,10 @@ while kill -0 "$PID"; do
    sleep 1
 done
 
-echo "$PID is done, copying ${CHECKPOINT} to gs://${BUCKET_NAME} as ${MY_USER}"
+echo "$PID is done, copying ${SOURCE_DIRECTORY} to gs://${BUCKET_NAME} as ${MY_USER}"
 
-su "${MY_USER}" -c "gcloud storage cp $CHECKPOINT gs://${BUCKET_NAME}/"
+# su "${MY_USER}" -c "gcloud storage rsync $SOURCE_DIRECTORY gs://${BUCKET_NAME} --recursive --delete-unmatched-destination-objects --exclude=\".*\/\.DS_Store$|.*\/\.venv\/.*$|.*\/\.vscode\/.*$|.*\/__pycache__\/.*$|.*\/\.gitignore$\""
+su "${MY_USER}" -c "gcloud storage rsync ${SOURCE_DIRECTORY} gs://${BUCKET_NAME} --delete-unmatched-destination-objects --recursive --exclude=\"${EXCLUDE_REGEX}\""
 
 echo "Done uploading, shutting down."
+
