@@ -11,6 +11,9 @@ imgs/*
 # Ignore checkpoints
 **/checkpoints/**
 
+# Ignore specific runs
+**/runs/**
+
 # Ignore any images inside frames directories
 **/frames/**
 
