@@ -1,4 +1,6 @@
-torchinfo
-pytorch
+torch
 torchvision
+torchinfo
 deformable_attention
+matplotlib
+tensorboard

@@ -26,7 +26,7 @@ class ModelCheckpointer:
                         epoch: int,
                         global_step: int,
                         model: torch.nn.Module,
-                        optimizer: torch.optim.optimizer.Optimizer,
+                        optimizer: torch.optim.Optimizer,
                         scheduler: WarmupCosineScheduler,
                         loss: float) -> None:
         """
