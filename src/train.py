@@ -1,4 +1,3 @@
-import os
 import torch
 from torch import nn
 from torch.utils.data import DataLoader, random_split
@@ -9,33 +8,40 @@ from utils.checkpointer import ModelCheckpointer
 from utils.lr_scheduler import WarmupCosineScheduler
 
 # Run Name
-RUN_NAME = "exp1"
+RUN_NAME = "test1"
+DEBUG_VERBOSE = True
 
 # Constants
-LISA_DAY_DIRECTORIES = [
-    '/Users/gordonliu/Documents/ml_projects/LightFormer2/data/Kaggle_Dataset/daySequence1',
-    '/Users/gordonliu/Documents/ml_projects/LightFormer2/data/Kaggle_Dataset/daySequence2',
-    '/Users/gordonliu/Documents/ml_projects/LightFormer2/data/Kaggle_Dataset/dayTrain/dayClip1',
-    '/Users/gordonliu/Documents/ml_projects/LightFormer2/data/Kaggle_Dataset/dayTrain/dayClip2',
-    '/Users/gordonliu/Documents/ml_projects/LightFormer2/data/Kaggle_Dataset/dayTrain/dayClip3',
-    '/Users/gordonliu/Documents/ml_projects/LightFormer2/data/Kaggle_Dataset/dayTrain/dayClip4',
-    '/Users/gordonliu/Documents/ml_projects/LightFormer2/data/Kaggle_Dataset/dayTrain/dayClip5',
-    '/Users/gordonliu/Documents/ml_projects/LightFormer2/data/Kaggle_Dataset/dayTrain/dayClip6',
-    '/Users/gordonliu/Documents/ml_projects/LightFormer2/data/Kaggle_Dataset/dayTrain/dayClip7',
-    '/Users/gordonliu/Documents/ml_projects/LightFormer2/data/Kaggle_Dataset/dayTrain/dayClip8',
-    '/Users/gordonliu/Documents/ml_projects/LightFormer2/data/Kaggle_Dataset/dayTrain/dayClip9',
-    '/Users/gordonliu/Documents/ml_projects/LightFormer2/data/Kaggle_Dataset/dayTrain/dayClip10',
-    '/Users/gordonliu/Documents/ml_projects/LightFormer2/data/Kaggle_Dataset/dayTrain/dayClip11',
-    '/Users/gordonliu/Documents/ml_projects/LightFormer2/data/Kaggle_Dataset/dayTrain/dayClip12',
-    '/Users/gordonliu/Documents/ml_projects/LightFormer2/data/Kaggle_Dataset/dayTrain/dayClip13',]
-LISA_NIGHT_DIRECTORIES = [
-    '/Users/gordonliu/Documents/ml_projects/LightFormer2/data/Kaggle_Dataset/nightSequence1',
-    '/Users/gordonliu/Documents/ml_projects/LightFormer2/data/Kaggle_Dataset/nightSequence2',
-    '/Users/gordonliu/Documents/ml_projects/LightFormer2/data/Kaggle_Dataset/nightTrain/nightClip1',
-    '/Users/gordonliu/Documents/ml_projects/LightFormer2/data/Kaggle_Dataset/nightTrain/nightClip2',
-    '/Users/gordonliu/Documents/ml_projects/LightFormer2/data/Kaggle_Dataset/nightTrain/nightClip3',
-    '/Users/gordonliu/Documents/ml_projects/LightFormer2/data/Kaggle_Dataset/nightTrain/nightClip4',
-    '/Users/gordonliu/Documents/ml_projects/LightFormer2/data/Kaggle_Dataset/nightTrain/nightClip5']
+LISA_DIRECTORY = '/Users/gordonliu/Documents/ml_projects/LightFormer2/data/Kaggle_Dataset'
+LISA_PREPROCESSED_DIRECTORY = '/Users/gordonliu/Documents/ml_projects/LightFormer2/data/LISA_Preprocessed'
+LISA_DAY_SUBDIRECTORIES = [
+    'daySequence1',
+    'daySequence2',
+    'dayTrain/dayClip1',
+    'dayTrain/dayClip2',
+    'dayTrain/dayClip3',
+    'dayTrain/dayClip4',
+    'dayTrain/dayClip5',
+    'dayTrain/dayClip6',
+    'dayTrain/dayClip7',
+    'dayTrain/dayClip8',
+    'dayTrain/dayClip9',
+    'dayTrain/dayClip10',
+    'dayTrain/dayClip11',
+    'dayTrain/dayClip12',
+    'dayTrain/dayClip13',]
+LISA_NIGHT_SUBDIRECTORIES = [
+    'nightSequence1',
+    'nightSequence2',
+    'nightTrain/nightClip1',
+    'nightTrain/nightClip2',
+    'nightTrain/nightClip3',
+    'nightTrain/nightClip4',
+    'nightTrain/nightClip5']
+LISA_SAMPLE_SUBDIRECTORIES = [
+    'sample-dayClip6',
+    'sample-nightClip1',
+]
 TRAIN_SPLIT = 0.8
 TEST_SPLIT  = 0.1
 VAL_SPLIT   = 0.1
@@ -189,12 +195,24 @@ def run_training(epoch, epochs, train_dataloader, model, train_loss_fn, optimize
         writer.flush()
 
 # Constants no matter progress on run.
-full_dataset = LightFormerDataset(directory=LISA_DAY_DIRECTORIES)
+
+full_dataset = LightFormerDataset(directory=LISA_DIRECTORY,
+                                  preprocessed_directory=LISA_PREPROCESSED_DIRECTORY,
+                                  subdirectories=LISA_NIGHT_SUBDIRECTORIES,
+                                  preprocessed=False)
+generator=torch.Generator().manual_seed(42)
 train_dataset, test_dataset, val_dataset = random_split(full_dataset,
                                                         [TRAIN_SPLIT, TEST_SPLIT, VAL_SPLIT],
-                                                        generator=torch.Generator().manual_seed(42))
-train_dataloader = DataLoader(train_dataset, batch_size=BATCH_SIZE, sampler=create_weighted_sampler(train_dataset))
+                                                        generator=generator)
+if DEBUG_VERBOSE: print("Created all datasets")
+
+weighted_sampler=create_weighted_sampler(train_dataset)
+if DEBUG_VERBOSE: print("Created weighted sampler")
+
+train_dataloader = DataLoader(train_dataset, batch_size=BATCH_SIZE, sampler=weighted_sampler)
 val_dataloader = DataLoader(val_dataset, batch_size=BATCH_SIZE) # val doesn't need resampling
+if DEBUG_VERBOSE: print("Created all dataloaders")
+
 device = (
     "cuda"
     if torch.cuda.is_available()
@@ -202,17 +220,21 @@ device = (
     if torch.backends.mps.is_available()
     else "cpu"
 )
+if DEBUG_VERBOSE: print(f"Using device {device}")
+
 train_loss_fn = nn.CrossEntropyLoss()
 val_loss_fn = nn.CrossEntropyLoss(reduction='sum')
 writer = SummaryWriter(log_dir=f"runs/{RUN_NAME}")
 checkpointer = ModelCheckpointer(save_dir=f"checkpoints/{RUN_NAME}")
+if DEBUG_VERBOSE: print("Created Loss Functions, Tensorboard writer, and Checkpointer")
 
 # The rest depend on whether or not a checkpoint exists.
 checkpoints = checkpointer.checkpoint_files
 if len(checkpoints) == 0: # no checkpoints yet, instantiate new values
+    if DEBUG_VERBOSE: print("No checkpoints: Instantiating new values.")
     epoch = 0
     global_step = [0]
-    model = LightFormer().to(device) # summary(model, input_size=(batch_size, 10, 3, 512, 960))
+    model = LightFormer().to(device) # from torchvision package, summary(model, input_size=(batch_size, 10, 3, 512, 960))
     for param in model.backbone.resnet.parameters(): # freeze resnet
         param.requires_grad = False
     optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
@@ -224,6 +246,7 @@ if len(checkpoints) == 0: # no checkpoints yet, instantiate new values
                                     T_mult=2,
                                     eta_min=1e-7)
 else: # checkpoints exist, we are in the middle of training and grab states for next training epoch.
+    if DEBUG_VERBOSE: print(f"Checkpoints exist: Loading {checkpoints[-1]} and continuing from last epoch")
     checkpoint = torch.load(checkpoints[-1]) # load the latest checkpoint
     epoch = checkpoint['epoch']
     global_step = [checkpoint['global_step']]
