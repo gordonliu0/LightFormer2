@@ -23,4 +23,6 @@ __pycache__/
 *.py[cod]
 *$py.class
 
-# Ignore
+# Ignore Necromancer related scripts
+shutdown.sh
+startup.sh
