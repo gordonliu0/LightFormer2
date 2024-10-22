@@ -1,4 +1,6 @@
 import torch
+import os
+import subprocess
 from torch import nn
 from torch.utils.data import DataLoader, random_split
 from torch.utils.tensorboard import SummaryWriter
@@ -12,7 +14,7 @@ RUN_NAME = "test1"
 DEBUG_VERBOSE = True
 
 # Constants
-LISA_DIRECTORY = '/Users/gordonliu/Documents/ml_projects/LightFormer2/data/Kaggle_Dataset'
+LISA_DIRECTORY = '/Home/gordonliu1106/Necromancer/data/Kaggle_Dataset'
 LISA_PREPROCESSED_DIRECTORY = '/Users/gordonliu/Documents/ml_projects/LightFormer2/data/LISA_Preprocessed'
 LISA_DAY_SUBDIRECTORIES = [
     # 'daySequence1',
@@ -269,3 +271,7 @@ run_training(
     scheduler=scheduler,
     checkpointer=checkpointer
 )
+
+# Run any cleanup bash commands after training finishes. Perform things like logging, storage updates, and stopping compute instances here.
+cleanup = subprocess.run(['bash', '../cleanup.sh'], cwd=os.path.dirname(os.path.realpath(__file__)), capture_output=True, text=True, check=True)
+print(cleanup.stdout)

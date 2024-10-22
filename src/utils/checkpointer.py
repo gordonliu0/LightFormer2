@@ -4,7 +4,7 @@ from datetime import datetime
 from utils.lr_scheduler import WarmupCosineScheduler
 
 class ModelCheckpointer:
-    def __init__(self, save_dir: str, max_checkpoints: int = 10, keep_latest: bool = True, prune_fn: function = lambda x: x['loss'], prune_lowest: bool = False):
+    def __init__(self, save_dir: str, max_checkpoints: int = 10, keep_latest: bool = True, prune_fn = lambda x: x['loss'], prune_lowest: bool = False):
         """
         Checkpointer controlling checkpoint behavior of training.
         Checkpointer keeps max_checkpoints 'best' checkpoints based on prune_fn. By default, keeps 5 based on lowest loss.
