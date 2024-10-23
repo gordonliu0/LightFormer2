@@ -30,3 +30,7 @@ __pycache__/
 shutdown.sh
 startup.sh
 cleanup.sh
+monitor.sh
+necromancer-setup.sh
+SCRIPTS_README.md
+startupcopy.sh
