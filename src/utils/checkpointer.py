@@ -108,10 +108,15 @@ class ModelCheckpointer:
         os.remove(os.path.join(self.save_dir, name))
 
     def load_checkpoint_by_name(self, name: str):
-        """Load a checkpoint by index."""
+        """Load a checkpoint by name."""
         checkpoint_path = os.path.join(self.save_dir, name)
         checkpoint = torch.load(checkpoint_path)
         return checkpoint
+
+    def load_latest(self):
+        """Load a checkpoint by index."""
+        latest = sorted(self._checkpoints, key= lambda x: x['timestamp'])[-1]
+        return latest
 
 # Example usage in a training loop:
 # checkpointer = ModelCheckpointer('checkpoints', max_saves=5)

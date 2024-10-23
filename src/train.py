@@ -8,58 +8,8 @@ from models import LightFormer
 from dataset import LightFormerDataset, create_weighted_sampler
 from utils.checkpointer import ModelCheckpointer
 from utils.lr_scheduler import WarmupCosineScheduler
-
-# Run Name
-RUN_NAME = "test1"
-DEBUG_VERBOSE = True
-
-# Constants
-LISA_DIRECTORY = '/Home/gordonliu1106/Necromancer/data/Kaggle_Dataset'
-LISA_PREPROCESSED_DIRECTORY = '/Users/gordonliu/Documents/ml_projects/LightFormer2/data/LISA_Preprocessed'
-LISA_DAY_SUBDIRECTORIES = [
-    # 'daySequence1',
-    # 'daySequence2',
-    # 'dayTrain/dayClip1',
-    # 'dayTrain/dayClip2',
-    # 'dayTrain/dayClip3',
-    # 'dayTrain/dayClip4',
-    # 'dayTrain/dayClip5',
-    # 'dayTrain/dayClip6',
-    # 'dayTrain/dayClip7',
-    # 'dayTrain/dayClip8',
-    # 'dayTrain/dayClip9',
-    # 'dayTrain/dayClip10',
-    # 'dayTrain/dayClip11',
-    # 'dayTrain/dayClip12',
-    'dayTrain/dayClip13',]
-
-LISA_NIGHT_SUBDIRECTORIES = [
-    'nightSequence1',
-    'nightSequence2',
-    'nightTrain/nightClip1',
-    'nightTrain/nightClip2',
-    'nightTrain/nightClip3',
-    'nightTrain/nightClip4',
-    'nightTrain/nightClip5']
-LISA_SAMPLE_SUBDIRECTORIES = [
-    'sample-dayClip6',
-    'sample-nightClip1',
-]
-TRAIN_SPLIT = 0.8
-TEST_SPLIT  = 0.1
-VAL_SPLIT   = 0.1
-
-# Hyperparameters
-BATCH_SIZE = 32
-
-# Constant Learning Rate, empirically determined from learning_rate_finder
-# LEARNING_RATE = 5e-6
-# EPOCHS = 15
-
-# Learning Rate Scheduler: Warmup + SGDR
-LEARNING_RATE = 1e-6
-WARMUP_STEPS = 2
-EPOCHS = 33 # 2 Warmup + 31 SGDR (broken into (1 + 2 + 4 + 8 + 16) steps)
+import json
+import argparse
 
 # Training Step, Validation Step, and Training Loop
 def train(dataloader, model, loss_fn, optimizer, writer, global_step):
@@ -197,80 +147,142 @@ def run_training(epoch, epochs, train_dataloader, model, train_loss_fn, optimize
         # Flush writer after each epoch
         writer.flush()
 
-# Constants no matter progress on run.
+def parse_args():
+    parser = argparse.ArgumentParser(description='Script to train LightFormer with multiple runs. Configure runs using multiple config json files. Example is provided in configs directory.')
+    parser.add_argument(
+        '-c', '--config',
+        type=str,
+        required=True,
+        nargs='+',
+        help='Paths to one or more config JSON files'
+    )
+    return parser.parse_args()
 
-full_dataset = LightFormerDataset(directory=LISA_DIRECTORY,
-                                  preprocessed_directory=LISA_PREPROCESSED_DIRECTORY,
-                                  subdirectories=LISA_DAY_SUBDIRECTORIES)
-generator=torch.Generator().manual_seed(42)
-train_dataset, test_dataset, val_dataset = random_split(full_dataset,
-                                                        [TRAIN_SPLIT, TEST_SPLIT, VAL_SPLIT],
-                                                        generator=generator)
-if DEBUG_VERBOSE: print("Created all datasets")
+def load_config(config_path: str) -> dict:
+    """Load a single config file."""
+    try:
+        with open(config_path, 'r') as f:
+            return json.load(f)
+    except FileNotFoundError:
+        print(f"Error: Config file '{config_path}' not found")
+        return None
+    except json.JSONDecodeError:
+        print(f"Error: '{config_path}' is not a valid JSON file")
+        return None
 
-# weighted_sampler=create_weighted_sampler(train_dataset)
-# if DEBUG_VERBOSE: print("Created weighted sampler")
-# train_dataloader = DataLoader(train_dataset, batch_size=BATCH_SIZE, sampler=weighted_sampler)
+def load_configs(config_paths):
+    """
+    Load multiple config files.
+    """
+    configs = []
+    for path in config_paths:
+        config = load_config(path)
+        if config is not None:
+            configs.append(config)
+    return configs
 
-train_dataloader = DataLoader(train_dataset, batch_size=BATCH_SIZE) #temp unweighted sampling train dataloader
-val_dataloader = DataLoader(val_dataset, batch_size=BATCH_SIZE) # val doesn't need resampling
-if DEBUG_VERBOSE: print("Created all dataloaders")
+args = parse_args()
+configs = load_configs(args.config)
 
-device = (
-    "cuda"
-    if torch.cuda.is_available()
-    else "mps"
-    if torch.backends.mps.is_available()
-    else "cpu"
-)
-if DEBUG_VERBOSE: print(f"Using device {device}")
+# Run multiple trainings, each one starting if not finished.
+for config in configs:
+    RUN_NAME = config["run_name"]
+    DEBUG_VERBOSE = config["debug_verbose"]
 
-train_loss_fn = nn.CrossEntropyLoss()
-val_loss_fn = nn.CrossEntropyLoss(reduction='sum')
-writer = SummaryWriter(log_dir=f"runs/{RUN_NAME}")
-checkpointer = ModelCheckpointer(save_dir=f"checkpoints/{RUN_NAME}")
-if DEBUG_VERBOSE: print("Created Loss Functions, Tensorboard writer, and Checkpointer")
+    LISA_ROOT_DIR = config["directories"]["lisa"]["base"]
+    LISA_PREPROCESSED_DIR = config["directories"]["lisa"]["preprocessed"]
+    LISA_DAY_SUBDIR = config["directories"]["lisa"]["day_subdirectories"]
+    LISA_NIGHT_SUBDIR = config["directories"]["lisa"]["night_subdirectories"]
+    LISA_SAMPLE_SUBDIR = config["directories"]["lisa"]["sample_subdirectories"]
 
-# The rest depend on whether or not a checkpoint exists.
-if len(checkpointer) == 0: # no checkpoints yet, instantiate new values
-    if DEBUG_VERBOSE: print("No checkpoints: Instantiating new values.")
-    epoch = 0
-    global_step = [0]
-    model = LightFormer().to(device) # from torchvision package, summary(model, input_size=(batch_size, 10, 3, 512, 960))
-    for param in model.backbone.resnet.parameters(): # freeze resnet
-        param.requires_grad = False
-    optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
-    scheduler = WarmupCosineScheduler(optimizer=optimizer,
-                                    warmup_steps=WARMUP_STEPS,
-                                    warmup_start_factor=0.1,
-                                    warmup_end_factor=1,
-                                    T_0=1,
-                                    T_mult=2,
-                                    eta_min=1e-7)
-else: # checkpoints exist, we are in the middle of training and grab states for next training epoch.
-    if DEBUG_VERBOSE: print(f"Checkpoints exist: Loading {checkpointer.checkpoint_files[-1]} and continuing from last epoch")
-    checkpoint = checkpointer.load_checkpoint(-1) # load the latest checkpoint
-    epoch = checkpoint['epoch']
-    global_step = [checkpoint['global_step']]
-    model = checkpoint['model']
-    optimizer = checkpoint['optimizer']
-    scheduler = checkpoint['scheduler']
+    TRAIN_SPLIT = config["splits"]["train"]
+    TEST_SPLIT = config["splits"]["test"]
+    VAL_SPLIT = config["splits"]["validation"]
 
-# RUN TRAINING!
-run_training(
-    epoch=epoch,
-    epochs=EPOCHS,
-    train_dataloader=train_dataloader,
-    model=model,
-    train_loss_fn=train_loss_fn,
-    optimizer=optimizer,
-    writer=writer,
-    global_step=global_step,
-    val_dataloader=val_dataloader,
-    val_loss_fn=val_loss_fn,
-    scheduler=scheduler,
-    checkpointer=checkpointer
-)
+    BATCH_SIZE = config["training"]["batch_size"]
+    LEARNING_RATE = config["training"]["lr"]
+    WARMUP_STEPS = config["training"]["lr_scheduler"]["warmup_steps"]
+    WARMUP_START_FACTOR = config["training"]["lr_scheduler"]["warmup_start_factor"]
+    WARMUP_END_FACTOR = config["training"]["lr_scheduler"]["warmup_end_factor"]
+    T_0 = config["training"]["lr_scheduler"]["t_0"]
+    T_MULT = config["training"]["lr_scheduler"]["t_mult"]
+    ETA_MIN = config["training"]["lr_scheduler"]["eta_min"]
+    EPOCHS = config["training"]["epochs"]
+
+    # Constants no matter progress on run.
+    full_dataset = LightFormerDataset(directory=LISA_ROOT_DIR,
+                                    preprocessed_directory=LISA_PREPROCESSED_DIR,
+                                    subdirectories=LISA_DAY_SUBDIR)
+    generator=torch.Generator().manual_seed(42)
+    train_dataset, test_dataset, val_dataset = random_split(full_dataset,
+                                                            [TRAIN_SPLIT, TEST_SPLIT, VAL_SPLIT],
+                                                            generator=generator)
+    if DEBUG_VERBOSE: print("Created all datasets")
+
+    # weighted_sampler=create_weighted_sampler(train_dataset)
+    # if DEBUG_VERBOSE: print("Created weighted sampler")
+    # train_dataloader = DataLoader(train_dataset, batch_size=BATCH_SIZE, sampler=weighted_sampler)
+
+    train_dataloader = DataLoader(train_dataset, batch_size=BATCH_SIZE) #temp unweighted sampling train dataloader
+    val_dataloader = DataLoader(val_dataset, batch_size=BATCH_SIZE) # val doesn't need resampling
+    if DEBUG_VERBOSE: print("Created all dataloaders")
+
+    device = (
+        "cuda"
+        if torch.cuda.is_available()
+        else "mps"
+        if torch.backends.mps.is_available()
+        else "cpu"
+    )
+    if DEBUG_VERBOSE: print(f"Using device {device}")
+
+    train_loss_fn = nn.CrossEntropyLoss()
+    val_loss_fn = nn.CrossEntropyLoss(reduction='sum')
+    writer = SummaryWriter(log_dir=f"runs/{RUN_NAME}")
+    checkpointer = ModelCheckpointer(save_dir=f"checkpoints/{RUN_NAME}")
+    if DEBUG_VERBOSE: print("Created Loss Functions, Tensorboard writer, and Checkpointer")
+
+    # The rest depend on whether or not a checkpoint exists.
+    if len(checkpointer) == 0: # no checkpoints yet, instantiate new values
+        if DEBUG_VERBOSE: print("No checkpoints: Instantiating new values.")
+        epoch = 0
+        global_step = [0]
+        model = LightFormer().to(device) # from torchvision package, summary(model, input_size=(batch_size, 10, 3, 512, 960))
+        for param in model.backbone.resnet.parameters(): # freeze resnet
+            param.requires_grad = False
+        optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
+        scheduler = WarmupCosineScheduler(optimizer=optimizer,
+                                        warmup_steps=WARMUP_STEPS,
+                                        warmup_start_factor=WARMUP_START_FACTOR,
+                                        warmup_end_factor=WARMUP_END_FACTOR,
+                                        T_0=T_0,
+                                        T_mult=T_MULT,
+                                        eta_min=ETA_MIN)
+    else: # checkpoints exist, we are in the middle of training and grab states for next training epoch.
+        if DEBUG_VERBOSE: print(f"Checkpoints exist: Loading {checkpointer.checkpoint_files[-1]} and continuing from last epoch")
+        checkpoint = checkpointer.load_latest() # load the latest checkpoint
+        epoch = checkpoint['epoch']
+        global_step = [checkpoint['global_step']]
+        model = checkpoint['model']
+        optimizer = checkpoint['optimizer']
+        scheduler = checkpoint['scheduler']
+
+    # RUN TRAINING!
+    print("Starting run:", RUN_NAME)
+    run_training(
+        epoch=epoch,
+        epochs=EPOCHS,
+        train_dataloader=train_dataloader,
+        model=model,
+        train_loss_fn=train_loss_fn,
+        optimizer=optimizer,
+        writer=writer,
+        global_step=global_step,
+        val_dataloader=val_dataloader,
+        val_loss_fn=val_loss_fn,
+        scheduler=scheduler,
+        checkpointer=checkpointer
+    )
 
 # Run any cleanup bash commands after training finishes. Perform things like logging, storage updates, and stopping compute instances here.
 cleanup = subprocess.run(['bash', '../cleanup.sh'], cwd=os.path.dirname(os.path.realpath(__file__)), capture_output=True, text=True, check=True)
