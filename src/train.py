@@ -4,15 +4,19 @@ import subprocess
 from torch import nn
 from torch.utils.data import DataLoader, random_split
 from torch.utils.tensorboard import SummaryWriter
-from models import LightFormer
+from models import LightFormer, ChimeFormer
 from dataset import LightFormerDataset, create_weighted_sampler
 from utils.checkpointer import ModelCheckpointer
 from utils.lr_scheduler import WarmupCosineScheduler
 import json
 import argparse
+from torchinfo import summary
+
+# model = ChimeFormer()
+# summary(model, input_size=(16, 10, 3, 512, 960))
 
 # Training Step, Validation Step, and Training Loop
-def train(dataloader, model, loss_fn, optimizer, writer, global_step):
+def train(dataloader, model, loss_fn, optimizer, writer, global_step, verbose):
     '''
     Run a single training epoch.
 
@@ -38,16 +42,20 @@ def train(dataloader, model, loss_fn, optimizer, writer, global_step):
         lf_loss = loss_fn(lf_class, y[1])
         total_loss = st_loss + lf_loss
 
-        # Backpropagation
-        total_loss.backward()
-        optimizer.step()
-        optimizer.zero_grad()
+        # Verbose Prints
+        if verbose:
+            print(f"Step {global_step}: total_loss {total_loss}")
 
         # Report to tensorboard
         writer.add_scalar("Loss/train/st", st_loss.item(), global_step[0])
         writer.add_scalar("Loss/train/lf", lf_loss.item(), global_step[0])
         writer.add_scalar("Loss/train/total", total_loss.item(), global_step[0])
         global_step[0] += 1
+
+        # Backpropagation
+        total_loss.backward()
+        optimizer.step()
+        optimizer.zero_grad()
 
 def validate(dataloader, model, loss_fn):
     '''
@@ -93,7 +101,7 @@ def validate(dataloader, model, loss_fn):
     # Return
     return st_loss, lf_loss, total_loss, st_accuracy, lf_accuracy, total_accuracy
 
-def run_training(epoch, epochs, train_dataloader, model, train_loss_fn, optimizer, writer, global_step, val_dataloader, val_loss_fn, scheduler, checkpointer: ModelCheckpointer):
+def run_training(epoch, epochs, train_dataloader, model, train_loss_fn, optimizer, writer, global_step, val_dataloader, val_loss_fn, scheduler, checkpointer: ModelCheckpointer, verbose):
     """
     Run training over a number of epochs.
 
@@ -118,7 +126,8 @@ def run_training(epoch, epochs, train_dataloader, model, train_loss_fn, optimize
               loss_fn=train_loss_fn,
               optimizer=optimizer,
               writer=writer,
-              global_step=global_step)
+              global_step=global_step,
+              verbose=verbose)
 
         # Validate
         st_loss, lf_loss, total_loss, st_accuracy, lf_accuracy, total_accuracy = validate(val_dataloader, model, val_loss_fn)
@@ -147,6 +156,11 @@ def run_training(epoch, epochs, train_dataloader, model, train_loss_fn, optimize
         # Flush writer after each epoch
         writer.flush()
 
+        # Verbose Logs
+        if verbose:
+            print(f"Epoch {e} complete. Validation Metrics: total_loss {total_loss}, total_accuracy {total_accuracy}")
+
+# Args and Configs
 def parse_args():
     parser = argparse.ArgumentParser(description='Script to train LightFormer with multiple runs. Configure runs using multiple config json files. Example is provided in configs directory.')
     parser.add_argument(
@@ -181,6 +195,7 @@ def load_configs(config_paths):
             configs.append(config)
     return configs
 
+# Start Training Script
 args = parse_args()
 configs = load_configs(args.config)
 
@@ -189,16 +204,17 @@ for config in configs:
     RUN_NAME = config["run_name"]
     DEBUG_VERBOSE = config["debug_verbose"]
 
-    LISA_ROOT_DIR = config["directories"]["lisa"]["base"]
-    LISA_PREPROCESSED_DIR = config["directories"]["lisa"]["preprocessed"]
-    LISA_DAY_SUBDIR = config["directories"]["lisa"]["day_subdirectories"]
-    LISA_NIGHT_SUBDIR = config["directories"]["lisa"]["night_subdirectories"]
-    LISA_SAMPLE_SUBDIR = config["directories"]["lisa"]["sample_subdirectories"]
+    LISA_ROOT_DIR = config["dataset"]["lisa"]["base"]
+    LISA_PREPROCESSED_DIR = config["dataset"]["lisa"]["preprocessed"]
+    LISA_DAY_SUBDIR = config["dataset"]["lisa"]["day_subdirectories"]
+    LISA_NIGHT_SUBDIR = config["dataset"]["lisa"]["night_subdirectories"]
+    LISA_SAMPLE_SUBDIR = config["dataset"]["lisa"]["sample_subdirectories"]
 
     TRAIN_SPLIT = config["splits"]["train"]
     TEST_SPLIT = config["splits"]["test"]
     VAL_SPLIT = config["splits"]["validation"]
 
+    FREEZE_BACKBONE = config["training"]["freeze_backbone"]
     BATCH_SIZE = config["training"]["batch_size"]
     LEARNING_RATE = config["training"]["lr"]
     WARMUP_STEPS = config["training"]["lr_scheduler"]["warmup_steps"]
@@ -219,11 +235,11 @@ for config in configs:
                                                             generator=generator)
     if DEBUG_VERBOSE: print("Created all datasets")
 
-    # weighted_sampler=create_weighted_sampler(train_dataset)
-    # if DEBUG_VERBOSE: print("Created weighted sampler")
-    # train_dataloader = DataLoader(train_dataset, batch_size=BATCH_SIZE, sampler=weighted_sampler)
+    weighted_sampler=create_weighted_sampler(train_dataset)
+    if DEBUG_VERBOSE: print("Created weighted sampler")
+    train_dataloader = DataLoader(train_dataset, batch_size=BATCH_SIZE, sampler=weighted_sampler)
 
-    train_dataloader = DataLoader(train_dataset, batch_size=BATCH_SIZE) #temp unweighted sampling train dataloader
+    # train_dataloader = DataLoader(train_dataset, batch_size=BATCH_SIZE) #temp unweighted sampling train dataloader
     val_dataloader = DataLoader(val_dataset, batch_size=BATCH_SIZE) # val doesn't need resampling
     if DEBUG_VERBOSE: print("Created all dataloaders")
 
@@ -247,9 +263,10 @@ for config in configs:
         if DEBUG_VERBOSE: print("No checkpoints: Instantiating new values.")
         epoch = 0
         global_step = [0]
-        model = LightFormer().to(device) # from torchvision package, summary(model, input_size=(batch_size, 10, 3, 512, 960))
-        for param in model.backbone.resnet.parameters(): # freeze resnet
-            param.requires_grad = False
+        model = ChimeFormer().to(device) # from torchvision package, summary(model, input_size=(batch_size, 10, 3, 512, 960))
+        if FREEZE_BACKBONE:
+            for param in model.backbone.resnet.parameters(): # freeze resnet
+                param.requires_grad = False
         optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
         scheduler = WarmupCosineScheduler(optimizer=optimizer,
                                         warmup_steps=WARMUP_STEPS,
@@ -281,7 +298,8 @@ for config in configs:
         val_dataloader=val_dataloader,
         val_loss_fn=val_loss_fn,
         scheduler=scheduler,
-        checkpointer=checkpointer
+        checkpointer=checkpointer,
+        verbose=DEBUG_VERBOSE
     )
 
 # Run any cleanup bash commands after training finishes. Perform things like logging, storage updates, and stopping compute instances here.

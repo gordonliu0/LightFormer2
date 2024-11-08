@@ -31,7 +31,7 @@ If desired, can also use:
 
 In LightFormer2 directory:
 
-PYTORCH_ENABLE_MPS_FALLBACK=1 python3 src/train.py
+PYTORCH_ENABLE_MPS_FALLBACK=1 python3 src/train.py --config /Users/gordonliu/Documents/ml_projects/LightFormer2/configs/chimeformer_debug.json
 
 # Testing
 
@@ -41,4 +41,4 @@ PYTORCH_ENABLE_MPS_FALLBACK=1 python3 src/test.py
 
 # Tensorboard
 
-tensorboard --logdir run
+tensorboard --logdir runs

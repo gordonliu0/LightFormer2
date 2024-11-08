@@ -2,7 +2,7 @@ from functools import partial
 from torch import nn
 from torchvision.models import resnet18, ResNet18_Weights
 from types import MethodType
-from models.identity import Identity
+from models.lightformer.identity import Identity
 
 class Backbone(nn.Module):
     def __init__(self):

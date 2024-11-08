@@ -1,7 +1,7 @@
 from torch import nn
-from models.backbone import Backbone
-from models.encoder import Encoder
-from models.decoder import Decoder
+from models.lightformer.backbone import Backbone
+from models.lightformer.encoder import Encoder
+from models.lightformer.decoder import Decoder
 
 class LightFormer(nn.Module):
     def __init__(self):

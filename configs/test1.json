@@ -1,0 +1,58 @@
+{
+  "run_name": "example",
+  "run_description": "Epochs broken into 2 Warmup + 31 SGDR (broken into (1 + 2 + 4 + 8 + 16) steps)",
+  "debug_verbose": true,
+  "dataset": {
+    "lisa": {
+      "base": "/Users/gordonliu/Documents/ml_projects/LightFormer2/data/Kaggle_Dataset",
+      "preprocessed": "/Users/gordonliu/Documents/ml_projects/LightFormer2/data/LISA_Preprocessed",
+      "day_subdirectories": [
+        "daySequence1",
+        "daySequence2",
+        "dayTrain/dayClip1",
+        "dayTrain/dayClip2",
+        "dayTrain/dayClip3",
+        "dayTrain/dayClip4",
+        "dayTrain/dayClip5",
+        "dayTrain/dayClip6",
+        "dayTrain/dayClip7",
+        "dayTrain/dayClip8",
+        "dayTrain/dayClip9",
+        "dayTrain/dayClip10",
+        "dayTrain/dayClip11",
+        "dayTrain/dayClip12",
+        "dayTrain/dayClip13"
+      ],
+      "night_subdirectories": [
+        "nightSequence1",
+        "nightSequence2",
+        "nightTrain/nightClip1",
+        "nightTrain/nightClip2",
+        "nightTrain/nightClip3",
+        "nightTrain/nightClip4",
+        "nightTrain/nightClip5"
+      ],
+      "sample_subdirectories": ["sample-dayClip6", "sample-nightClip1"]
+    }
+  },
+
+  "splits": {
+    "train": 0.8,
+    "test": 0.1,
+    "validation": 0.1
+  },
+
+  "training": {
+    "batch_size": 32,
+    "lr": 1e-6,
+    "lr_scheduler": {
+      "warmup_steps": 2,
+      "warmup_start_factor": 0.1,
+      "warmup_end_factor": 1,
+      "t_0": 1,
+      "t_mult": 2,
+      "eta_min": 1e-7
+    },
+    "epochs": 33
+  }
+}
