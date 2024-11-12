@@ -1,18 +1,18 @@
 import torch.nn as nn
-from models.lightformer.temporal_self_attention import TemporalSelfAttention
+from models.chimeformer.temporal_self_attention import TemporalSelfAttention
 from models.chimeformer.spatial_cross_attention import SpatialCrossAttention
 
 class Encoder(nn.Module):
-    def __init__(self):
+    def __init__(self, config):
         super().__init__()
 
-        self.embed_dim = 256    # self.config["embed_dim"]
+        self.embed_dim = config["model"]["embedding_dim"]    # self.config["embed_dim"]
         self.num_query = 1      # self.config["num_query"]
         self.num_heads = 16      # self.config["num_heads"]
 
         # main components
-        self.tsa = TemporalSelfAttention()
-        self.sca = SpatialCrossAttention()
+        self.tsa = TemporalSelfAttention(config=config)
+        self.sca = SpatialCrossAttention(config=config)
         self.mlp = nn.Sequential(
             nn.Linear(self.embed_dim, self.embed_dim),
             nn.ReLU(),

@@ -20,7 +20,7 @@ class ModelCheckpointer:
         self._save_dir = save_dir
         os.makedirs(save_dir, exist_ok=True)
         self._max_checkpoints = max_checkpoints
-        self._checkpoints = [self.load_checkpoint(n) for n in os.listdir(self.save_dir)]
+        self._checkpoints = [self.load_checkpoint_by_name(n) for n in os.listdir(self.save_dir)]
         self._keep_latest = keep_latest
         self._prune_fn = prune_fn
         self._prune_lowest = prune_lowest
@@ -49,8 +49,9 @@ class ModelCheckpointer:
                         global_step: int,
                         model: torch.nn.Module,
                         optimizer: torch.optim.Optimizer,
-                        scheduler: WarmupCosineScheduler,
-                        loss: float) -> None:
+                        loss: float,
+                        scheduler: WarmupCosineScheduler | None = None
+                        ) -> None:
         """
         Save a checkpoint of the model. Checkpoints should save states ready for the next training epoch.
 

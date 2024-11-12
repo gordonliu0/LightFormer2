@@ -12,9 +12,6 @@ import json
 import argparse
 from torchinfo import summary
 
-# model = ChimeFormer()
-# summary(model, input_size=(16, 10, 3, 512, 960))
-
 # Training Step, Validation Step, and Training Loop
 def train(dataloader, model, loss_fn, optimizer, writer, global_step, verbose):
     '''
@@ -101,7 +98,7 @@ def validate(dataloader, model, loss_fn):
     # Return
     return st_loss, lf_loss, total_loss, st_accuracy, lf_accuracy, total_accuracy
 
-def run_training(epoch, epochs, train_dataloader, model, train_loss_fn, optimizer, writer, global_step, val_dataloader, val_loss_fn, scheduler, checkpointer: ModelCheckpointer, verbose):
+def run_training(epoch, epochs, train_dataloader, model, train_loss_fn, optimizer, writer, global_step, val_dataloader, val_loss_fn, checkpointer: ModelCheckpointer, verbose, scheduler=None):
     """
     Run training over a number of epochs.
 
@@ -116,8 +113,9 @@ def run_training(epoch, epochs, train_dataloader, model, train_loss_fn, optimize
         global_step: Global step of training across epochs.
         val_dataloader: Dataloader for validation steps.
         val_loss_fn: Loss function for validation steps. For sums across batches rather than averages.
-        scheduler: Learning rate scheduler to update optimizer instance.
         checkpointer: Controls saving checkpoints every epoch.
+        verbose: Adds debug print statements.
+        scheduler: Learning rate scheduler to update optimizer instance.
     """
     for e in range(epoch, epochs):
         # Train
@@ -133,7 +131,8 @@ def run_training(epoch, epochs, train_dataloader, model, train_loss_fn, optimize
         st_loss, lf_loss, total_loss, st_accuracy, lf_accuracy, total_accuracy = validate(val_dataloader, model, val_loss_fn)
 
         # Tensorboard Logging
-        writer.add_scalar("LR", scheduler.get_last_lr()[0], e)
+        if scheduler:
+            writer.add_scalar("LR", scheduler.get_last_lr()[0], e)
         writer.add_scalar("Loss/val/st", st_loss, e)
         writer.add_scalar("Loss/val/lf", lf_loss, e)
         writer.add_scalar("Loss/val/total", total_loss, e)
@@ -142,7 +141,8 @@ def run_training(epoch, epochs, train_dataloader, model, train_loss_fn, optimize
         writer.add_scalar("Acc/val/total", total_accuracy, e)
 
         # Update Learning Rate
-        scheduler.step()
+        if scheduler:
+            scheduler.step()
 
         # Save Checkpoint after each epoch
         checkpointer.save_checkpoint(
@@ -198,6 +198,9 @@ def load_configs(config_paths):
 # Start Training Script
 args = parse_args()
 configs = load_configs(args.config)
+config = load_config("/Users/gordonliu/Documents/ml_projects/LightFormer2/configs/chime_2.json")
+chimeformer = ChimeFormer(config=config)
+summary(chimeformer, (16, 10, 3, 512, 960))
 
 # Run multiple trainings, each one starting if not finished.
 for config in configs:
@@ -217,6 +220,7 @@ for config in configs:
     FREEZE_BACKBONE = config["training"]["freeze_backbone"]
     BATCH_SIZE = config["training"]["batch_size"]
     LEARNING_RATE = config["training"]["lr"]
+    USE_LR_SCHEDULER = config["training"]["use_lr_scheduler"]
     WARMUP_STEPS = config["training"]["lr_scheduler"]["warmup_steps"]
     WARMUP_START_FACTOR = config["training"]["lr_scheduler"]["warmup_start_factor"]
     WARMUP_END_FACTOR = config["training"]["lr_scheduler"]["warmup_end_factor"]
@@ -263,21 +267,24 @@ for config in configs:
         if DEBUG_VERBOSE: print("No checkpoints: Instantiating new values.")
         epoch = 0
         global_step = [0]
-        model = ChimeFormer().to(device) # from torchvision package, summary(model, input_size=(batch_size, 10, 3, 512, 960))
+        model = ChimeFormer(config=config).to(device)
         if FREEZE_BACKBONE:
             for param in model.backbone.resnet.parameters(): # freeze resnet
                 param.requires_grad = False
         optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
-        scheduler = WarmupCosineScheduler(optimizer=optimizer,
-                                        warmup_steps=WARMUP_STEPS,
-                                        warmup_start_factor=WARMUP_START_FACTOR,
-                                        warmup_end_factor=WARMUP_END_FACTOR,
-                                        T_0=T_0,
-                                        T_mult=T_MULT,
-                                        eta_min=ETA_MIN)
+        if USE_LR_SCHEDULER:
+            scheduler = WarmupCosineScheduler(optimizer=optimizer,
+                                            warmup_steps=WARMUP_STEPS,
+                                            warmup_start_factor=WARMUP_START_FACTOR,
+                                            warmup_end_factor=WARMUP_END_FACTOR,
+                                            T_0=T_0,
+                                            T_mult=T_MULT,
+                                            eta_min=ETA_MIN)
+        else:
+            scheduler = None
     else: # checkpoints exist, we are in the middle of training and grab states for next training epoch.
-        if DEBUG_VERBOSE: print(f"Checkpoints exist: Loading {checkpointer.checkpoint_files[-1]} and continuing from last epoch")
         checkpoint = checkpointer.load_latest() # load the latest checkpoint
+        if DEBUG_VERBOSE: print(f"Checkpoints exist: Loading {checkpoint["name"]} and continuing from last epoch")
         epoch = checkpoint['epoch']
         global_step = [checkpoint['global_step']]
         model = checkpoint['model']
@@ -297,9 +304,9 @@ for config in configs:
         global_step=global_step,
         val_dataloader=val_dataloader,
         val_loss_fn=val_loss_fn,
-        scheduler=scheduler,
         checkpointer=checkpointer,
-        verbose=DEBUG_VERBOSE
+        verbose=DEBUG_VERBOSE,
+        scheduler=scheduler,
     )
 
 # Run any cleanup bash commands after training finishes. Perform things like logging, storage updates, and stopping compute instances here.

@@ -1,44 +1,46 @@
 import torch
 from torchvision import transforms
-from models import LightFormer
+from models import LightFormer, ChimeFormer
 from torch.utils.data import DataLoader, random_split
 from dataset import LightFormerDataset
 from torchvision.transforms.functional import invert
 import os
 
+from utils.checkpointer import ModelCheckpointer
+
+RUN_NAME = "chime_2"
+CHECKPOINT_INDEX = 3
+
 # Training Constants
-LISA_DAY_DIRECTORIES = [
-    '/Users/gordonliu/Documents/ml_projects/LightFormer2/data/Kaggle_Dataset/daySequence1',
-    '/Users/gordonliu/Documents/ml_projects/LightFormer2/data/Kaggle_Dataset/daySequence2',
-    '/Users/gordonliu/Documents/ml_projects/LightFormer2/data/Kaggle_Dataset/dayTrain/dayClip1',
-    '/Users/gordonliu/Documents/ml_projects/LightFormer2/data/Kaggle_Dataset/dayTrain/dayClip2',
-    '/Users/gordonliu/Documents/ml_projects/LightFormer2/data/Kaggle_Dataset/dayTrain/dayClip3',
-    '/Users/gordonliu/Documents/ml_projects/LightFormer2/data/Kaggle_Dataset/dayTrain/dayClip4',
-    '/Users/gordonliu/Documents/ml_projects/LightFormer2/data/Kaggle_Dataset/dayTrain/dayClip5',
-    '/Users/gordonliu/Documents/ml_projects/LightFormer2/data/Kaggle_Dataset/dayTrain/dayClip6',
-    '/Users/gordonliu/Documents/ml_projects/LightFormer2/data/Kaggle_Dataset/dayTrain/dayClip7',
-    '/Users/gordonliu/Documents/ml_projects/LightFormer2/data/Kaggle_Dataset/dayTrain/dayClip8',
-    '/Users/gordonliu/Documents/ml_projects/LightFormer2/data/Kaggle_Dataset/dayTrain/dayClip9',
-    '/Users/gordonliu/Documents/ml_projects/LightFormer2/data/Kaggle_Dataset/dayTrain/dayClip10',
-    '/Users/gordonliu/Documents/ml_projects/LightFormer2/data/Kaggle_Dataset/dayTrain/dayClip11',
-    '/Users/gordonliu/Documents/ml_projects/LightFormer2/data/Kaggle_Dataset/dayTrain/dayClip12',
-    '/Users/gordonliu/Documents/ml_projects/LightFormer2/data/Kaggle_Dataset/dayTrain/dayClip13',]
-LISA_NIGHT_DIRECTORIES = [
-    '/Users/gordonliu/Documents/ml_projects/LightFormer2/data/Kaggle_Dataset/nightSequence1',
-    '/Users/gordonliu/Documents/ml_projects/LightFormer2/data/Kaggle_Dataset/nightSequence2',
-    '/Users/gordonliu/Documents/ml_projects/LightFormer2/data/Kaggle_Dataset/nightTrain/nightClip1',
-    '/Users/gordonliu/Documents/ml_projects/LightFormer2/data/Kaggle_Dataset/nightTrain/nightClip2',
-    '/Users/gordonliu/Documents/ml_projects/LightFormer2/data/Kaggle_Dataset/nightTrain/nightClip3',
-    '/Users/gordonliu/Documents/ml_projects/LightFormer2/data/Kaggle_Dataset/nightTrain/nightClip4',
-    '/Users/gordonliu/Documents/ml_projects/LightFormer2/data/Kaggle_Dataset/nightTrain/nightClip5']
+LISA_ROOT_DIR = "/Users/gordonliu/Documents/ml_projects/LightFormer2/data/Kaggle_Dataset"
+LISA_PREPROCESSED_DIR = "/Users/gordonliu/Documents/ml_projects/LightFormer2/data/LISA_Preprocessed"
+LISA_DAY_SUBDIR = [
+        "daySequence1",
+        "daySequence2",
+        "dayTrain/dayClip1",
+        "dayTrain/dayClip2",
+        "dayTrain/dayClip3",
+        "dayTrain/dayClip4",
+        "dayTrain/dayClip5",
+        "dayTrain/dayClip6",
+        "dayTrain/dayClip7",
+        "dayTrain/dayClip8",
+        "dayTrain/dayClip9",
+        "dayTrain/dayClip10",
+        "dayTrain/dayClip11",
+        "dayTrain/dayClip12",
+        "dayTrain/dayClip13"
+      ]
 TRAIN_SPLIT = 0.8
 TEST_SPLIT  = 0.1
 VAL_SPLIT   = 0.1
-MODEL_CHECKPOINT = "/Users/gordonliu/Documents/ml_projects/LightForker-2/src/saved_checkpoints/time_20241014_055633_epoch_14loss_0.7771095633506775"
+MODEL_CHECKPOINT = "checkpoints/chimeformer_debug/epoch10time20241109_044136"
 VERBOSE = True
 
 # Datasets
-full_dataset = LightFormerDataset(directory=LISA_DAY_DIRECTORIES)
+full_dataset = LightFormerDataset(directory=LISA_ROOT_DIR,
+                                    preprocessed_directory=LISA_PREPROCESSED_DIR,
+                                    subdirectories=LISA_DAY_SUBDIR)
 generator = torch.Generator().manual_seed(42)
 train_dataset, test_dataset, val_dataset = random_split(full_dataset,
                                                         [TRAIN_SPLIT, TEST_SPLIT, VAL_SPLIT],
@@ -59,9 +61,11 @@ device = (
 print(f'Using device "{device}"')
 if device == "mps":
     os.environ['PYTORCH_ENABLE_MPS_FALLBACK'] = '1' # used to provide fallback if MPS
-model = LightFormer().to(device)
-model.load_state_dict(torch.load(MODEL_CHECKPOINT, weights_only=True))
-model.eval()
+
+# Checkpoint
+checkpointer = ModelCheckpointer(save_dir=f"checkpoints/{RUN_NAME}")
+checkpoint = checkpointer._checkpoints[CHECKPOINT_INDEX]
+model = checkpoint['model']
 
 # untransform image for display
 mean = torch.tensor([0.485, 0.456, 0.406]).to(device)

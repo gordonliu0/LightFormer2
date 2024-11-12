@@ -1,6 +1,6 @@
 {
-  "run_name": "chimeformer_debug",
-  "run_description": "ChimeFormer, Unfrozen, Epochs broken into 2 Warmup + 8 SGDR (broken into (8) steps)",
+  "run_name": "chime_2",
+  "run_description": "ChimeFormer, Unfrozen, 15 constant LR learning steps",
   "debug_verbose": true,
   "dataset": {
     "lisa": {
@@ -42,11 +42,16 @@
     "validation": 0.1
   },
 
+  "model": {
+    "embedding_dim": 128,
+    "backbone_resolution": 960
+  },
+
   "training": {
     "freeze_backbone": false,
     "batch_size": 8,
-    "lr": 1e-6,
-    "use_lr_scheduler": true,
+    "lr": 5e-6,
+    "use_lr_scheduler": false,
     "lr_scheduler": {
       "warmup_steps": 2,
       "warmup_start_factor": 0.1,
@@ -55,6 +60,6 @@
       "t_mult": 2,
       "eta_min": 1e-7
     },
-    "epochs": 10
+    "epochs": 25
   }
 }

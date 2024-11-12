@@ -80,29 +80,31 @@ class SpatialCrossAttention(nn.Module):
     """
     Alternate implementation of SpatialCrossAttention using DAT rather than DETR attention module.
     """
-    def __init__(self):
+    def __init__(self, config):
         super().__init__()
+
+        self.embed_dim = config["model"]["embedding_dim"]
+        self.backbone_resolution = config["model"]["backbone_resolution"]
 
         # DAT adapted for TSA query input (TSA query repeated to attend to each input 'pixel')
         self.deformable_attention = DeformableAttention(
-            dim = 256,                      # feature dimensions
-            dim_head = 16,                  # dimension per head
-            heads = 16,                     # attention heads
-            dropout = 0.1,                  # dropout
-            downsample_factor = 4,          # downsample factor (r in paper)
-            offset_scale = 4,               # scale of offset, maximum offset
-            offset_groups = 1,              # number of offset groups, a factor of heads
-            offset_kernel_size = 6,         # offset kernel size
+            dim = self.embed_dim, # feature dimensions
+            dim_head = 16,                          # dimension per head
+            heads = 8,                             # attention heads
+            dropout = 0.1,                          # dropout
+            downsample_factor = 4,                  # downsample factor (r in paper)
+            offset_scale = 4,                       # scale of offset, maximum offset
+            offset_groups = 1,                      # number of offset groups, a factor of heads
+            offset_kernel_size = 6,                 # offset kernel size
         )
         self.deformable_attention.forward = partial(_forward, self.deformable_attention)
 
         # 1D Convolution layer used to rescale the permuted output of deformable attention to fit TSA output
-        # 32 x 1920 x 256 -> 32 x 1 x 256
-        # 1920 comes from 32*60 size of feature maps from Backbone.
-        self.conv = nn.Conv1d(1920, 1, 1)
+        # 32 x (feature map pixles) x (embedding dim) -> 32 x 1 x (embedding dim) (right now 16*30)
+        self.conv = nn.Conv1d(self.backbone_resolution, 1, 1)
 
         # LayerNorm and Dropout for better generalization and smoother gradients
-        self.norm = nn.LayerNorm(256)
+        self.norm = nn.LayerNorm(self.embed_dim)
         self.dropout = nn.Dropout(0.1)
 
     def forward(self, x, q=None):
@@ -111,7 +113,7 @@ class SpatialCrossAttention(nn.Module):
         # a image embedding of the same shape as query
         output = self.deformable_attention(x, q)
         bs = x.shape[0]
-        output = output.view(bs, 256, -1).permute(0, 2, 1)
+        output = output.view(bs, self.embed_dim, -1).permute(0, 2, 1)
         output = self.conv(output)
 
         # LayerNorm, Dropout, and Skip Connections
